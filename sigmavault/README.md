@@ -15,7 +15,7 @@ Current encryption treats data as a sequence of bytes to be transformed. ΣVAULT
 
 ```
 Traditional Storage:        ΣVAULT Storage:
-                           
+
 ┌────────────────────┐     ┌────────────────────┐
 │ file.txt           │     │ ░░▓▓░░▓▓░░░░▓▓░░▓▓ │
 │ "Hello World"      │     │ ░▓░░▓░▓▓░░░░▓░░▓░░ │
@@ -35,20 +35,21 @@ Traditional Storage:        ΣVAULT Storage:
 
 Data isn't stored "somewhere" — its bits are dispersed across an 8-dimensional addressing manifold:
 
-| Dimension | Purpose |
-|-----------|---------|
-| **SPATIAL** | Physical position on medium |
-| **TEMPORAL** | Time-variant component (changes over time) |
-| **ENTROPIC** | Noise interleaving axis |
-| **SEMANTIC** | Content-derived offset |
-| **FRACTAL** | Self-similar recursion level |
-| **PHASE** | Wave-like interference angle |
-| **TOPOLOGICAL** | Graph connectivity relationships |
-| **HOLOGRAPHIC** | Redundancy shard identification |
+| Dimension       | Purpose                                    |
+| --------------- | ------------------------------------------ |
+| **SPATIAL**     | Physical position on medium                |
+| **TEMPORAL**    | Time-variant component (changes over time) |
+| **ENTROPIC**    | Noise interleaving axis                    |
+| **SEMANTIC**    | Content-derived offset                     |
+| **FRACTAL**     | Self-similar recursion level               |
+| **PHASE**       | Wave-like interference angle               |
+| **TOPOLOGICAL** | Graph connectivity relationships           |
+| **HOLOGRAPHIC** | Redundancy shard identification            |
 
 ### 2. Entropic Indistinguishability
 
 Real data bits are mixed with generated entropy in a key-dependent pattern. Without the key:
+
 - You cannot identify which bits are signal vs. noise
 - The ratio of real:entropy bits varies by location
 - The mixing pattern is non-repeating
@@ -58,6 +59,7 @@ Real data bits are mixed with generated entropy in a key-dependent pattern. With
 **The file's content determines where it's stored.**
 
 The first N bits of a file are used to derive the storage topology for the remaining bits. This creates a cryptographic bootstrap problem:
+
 - You need content to find content
 - But you need to find content to have content
 - Without the key, you cannot begin
@@ -135,11 +137,11 @@ fs.unlock_file("/secrets/passwords.txt", "extra_secret_passphrase")
 
 ### Key Modes
 
-| Mode | Security | Portability |
-|------|----------|-------------|
-| `hybrid` | Maximum | Requires original device + passphrase |
-| `device` | High | No passphrase, but device-locked |
-| `user` | Medium | Portable, passphrase only |
+| Mode     | Security | Portability                           |
+| -------- | -------- | ------------------------------------- |
+| `hybrid` | Maximum  | Requires original device + passphrase |
+| `device` | High     | No passphrase, but device-locked      |
+| `user`   | Medium   | Portable, passphrase only             |
 
 ```bash
 # Create with different modes
@@ -242,15 +244,15 @@ RETRIEVAL REQUEST
 
 ### What ΣVAULT Protects Against
 
-| Attack | Protection |
-|--------|------------|
-| **Direct Read** | Data is scattered, appears as noise |
-| **Pattern Analysis** | Entropic mixing eliminates patterns |
-| **Known Plaintext** | Self-referential topology prevents correlation |
-| **Time-based Analysis** | Temporal variance changes representation |
-| **Partial Recovery** | Need threshold of data for any reconstruction |
-| **Device Theft** | Hybrid mode requires both device + passphrase |
-| **Passphrase Theft** | Hybrid mode requires original device |
+| Attack                  | Protection                                     |
+| ----------------------- | ---------------------------------------------- |
+| **Direct Read**         | Data is scattered, appears as noise            |
+| **Pattern Analysis**    | Entropic mixing eliminates patterns            |
+| **Known Plaintext**     | Self-referential topology prevents correlation |
+| **Time-based Analysis** | Temporal variance changes representation       |
+| **Partial Recovery**    | Need threshold of data for any reconstruction  |
+| **Device Theft**        | Hybrid mode requires both device + passphrase  |
+| **Passphrase Theft**    | Hybrid mode requires original device           |
 
 ### What ΣVAULT Does NOT Protect Against
 
@@ -331,11 +333,11 @@ While ΣLANG compresses **meaning**, ΣVAULT scatters **existence**. Both operat
 
 ## Performance Considerations
 
-| Operation | Overhead |
-|-----------|----------|
-| Write | ~1.5-2x due to entropic expansion |
-| Read | ~1.5x due to gathering |
-| Storage | ~1.3-1.5x due to holographic redundancy |
+| Operation | Overhead                                |
+| --------- | --------------------------------------- |
+| Write     | ~1.5-2x due to entropic expansion       |
+| Read      | ~1.5x due to gathering                  |
+| Storage   | ~1.3-1.5x due to holographic redundancy |
 
 For maximum performance, ΣVAULT caches frequently accessed files in memory after decryption.
 
@@ -346,11 +348,39 @@ For maximum performance, ΣVAULT caches frequently accessed files in memory afte
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 Areas for contribution:
+
 - Windows filesystem driver (WinFsp integration)
 - macOS filesystem driver (macFUSE optimization)
 - Hardware acceleration for scattering operations
 - Additional holographic redundancy schemes
 - Formal security analysis
+
+---
+
+## Development Roadmap
+
+ΣVAULT follows a **12-phase development roadmap** toward production readiness:
+
+- **Phase 1-2:** Foundation & Cryptographic Hardening (Weeks 1-8)
+- **Phase 3-4:** Performance & Platform Support (Weeks 9-16)
+- **Phase 5-6:** ML Integration & Quantum-Safe (Weeks 17-28)
+- **Phase 7-8:** Formal Verification & Cryptanalysis (Weeks 29-40)
+- **Phase 9-10:** Ecosystem & Distribution (Weeks 41-52)
+- **Phase 11-12:** Production Hardening & Launch (Weeks 53-60)
+
+**Current Status:** Phase 1 - Foundation & Validation (Active)
+
+**Full Roadmap:** See [MASTER_CLASS_ACTION_PLAN.md](.github/MASTER_CLASS_ACTION_PLAN.md)  
+**Executive Summary:** See [MASTER_CLASS_ACTION_PLAN_EXECUTIVE_SUMMARY.md](.github/MASTER_CLASS_ACTION_PLAN_EXECUTIVE_SUMMARY.md)  
+**Phase 1 Guide:** See [PHASE_1_GETTING_STARTED.md](.github/PHASE_1_GETTING_STARTED.md)
+
+### Key Milestones
+
+- Week 4: Architecture validation complete
+- Week 8: Cryptographic hardening done
+- Week 16: Performance optimization finished
+- Week 28: Quantum-safe integration complete
+- Week 48: Production release ready
 
 ---
 
@@ -366,4 +396,4 @@ MIT License - See [LICENSE](LICENSE)
 
 ---
 
-*"The most secure data is data that doesn't exist in recognizable form."*
+_"The most secure data is data that doesn't exist in recognizable form."_
