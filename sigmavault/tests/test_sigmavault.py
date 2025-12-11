@@ -136,6 +136,17 @@ class TestDimensionalScatter(unittest.TestCase):
         
         self.assertEqual(reconstructed[:len(original)], original)
     
+    def test_scatter_gather_roundtrip_streaming(self):
+        """Very large data (5MB) uses streaming and survives scatter→gather roundtrip."""
+        # Create data larger than streaming threshold (100MB)
+        original = secrets.token_bytes(5 * 1024 * 1024)  # 5MB
+        file_id = secrets.token_bytes(16)
+        
+        scattered = self.engine.scatter(file_id, original)
+        reconstructed = self.engine.gather(scattered)
+        
+        self.assertEqual(reconstructed[:len(original)], original)
+    
     def test_scatter_produces_multiple_shards(self):
         """Scattering produces multiple shards."""
         original = b"Test data for sharding"

@@ -38,6 +38,12 @@ CORE INNOVATIONS:
    The storage medium contains ALL possible files simultaneously —
    only your key collapses it to YOUR file.
 
+MEMORY MANAGEMENT (PHASE 3):
+- Streaming processing for large files (>100MB)
+- Memory-bounded operations with configurable limits
+- Chunked entropy generation and mixing
+- Progressive topology generation
+
 Copyright 2025 - ΣVAULT Project
 """
 
@@ -46,11 +52,12 @@ import hashlib
 import secrets
 import struct
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any, Generator
+from typing import Dict, List, Optional, Tuple, Any, Generator, Iterator, BinaryIO
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 from pathlib import Path
 import time
+import io
 
 
 # ============================================================================
@@ -164,6 +171,10 @@ class EntropicMixer:
     pattern that varies across the dimensional manifold.
     """
     
+    # Memory limits for streaming operations
+    MAX_CHUNK_SIZE = 64 * 1024  # 64KB chunks for memory safety
+    STREAMING_THRESHOLD = 100 * 1024 * 1024  # 100MB threshold for streaming
+    
     def __init__(self, key_state: KeyState):
         self.key_state = key_state
         self.rng = np.random.Generator(np.random.PCG64(
@@ -176,6 +187,14 @@ class EntropicMixer:
         Returns mixed stream where real/entropy bits are interleaved
         according to key-dependent pattern.
         """
+        # Use streaming for large data
+        if len(real_bits) > self.STREAMING_THRESHOLD:
+            return self._mix_streaming(real_bits, coordinate)
+        
+        return self._mix_in_memory(real_bits, coordinate)
+    
+    def _mix_in_memory(self, real_bits: bytes, coordinate: DimensionalCoordinate) -> bytes:
+        """Original in-memory mixing for smaller data."""
         real_array = np.frombuffer(real_bits, dtype=np.uint8)
         
         # Generate entropy with coordinate-dependent seed
@@ -190,8 +209,20 @@ class EntropicMixer:
         ratio = self.key_state.entropy_ratio
         output_size = int(len(real_bits) / ratio)
         
-        # Generate entropy bytes
-        entropy = entropy_rng.integers(0, 256, size=output_size - len(real_bits), dtype=np.uint8)
+        # Generate entropy bytes (limit memory usage)
+        entropy_size = output_size - len(real_bits)
+        if entropy_size > 10 * 1024 * 1024:  # 10MB limit
+            # Generate entropy in chunks
+            entropy = bytearray()
+            remaining = entropy_size
+            while remaining > 0:
+                chunk_size = min(remaining, 1024 * 1024)  # 1MB chunks
+                chunk = entropy_rng.integers(0, 256, size=chunk_size, dtype=np.uint8)
+                entropy.extend(chunk)
+                remaining -= chunk_size
+            entropy = bytes(entropy)
+        else:
+            entropy = entropy_rng.integers(0, 256, size=entropy_size, dtype=np.uint8)
         
         # Generate mixing pattern (which positions are real vs entropy)
         pattern_rng = np.random.Generator(np.random.PCG64(
@@ -216,6 +247,80 @@ class EntropicMixer:
                 entropy_idx += 1
         
         return output.tobytes()
+    
+    def _mix_streaming(self, real_bits: bytes, coordinate: DimensionalCoordinate) -> bytes:
+        """
+        Streaming version of mix for large data.
+        Processes data in chunks to avoid memory exhaustion.
+        """
+        coord_seed = int.from_bytes(
+            hashlib.sha256(coordinate.to_bytes()).digest()[:8], 'big'
+        )
+        
+        # Calculate expansion ratio
+        ratio = self.key_state.entropy_ratio
+        output_size = int(len(real_bits) / ratio)
+        entropy_size = output_size - len(real_bits)
+        
+        # Generate mixing pattern first (this is the memory bottleneck we keep)
+        pattern_rng = np.random.Generator(np.random.PCG64(
+            coord_seed ^ self.key_state.topology_seed
+        ))
+        real_positions = pattern_rng.choice(output_size, size=len(real_bits), replace=False)
+        real_positions.sort()
+        
+        # Create output stream
+        output = io.BytesIO()
+        entropy_rng = np.random.Generator(np.random.PCG64(
+            coord_seed ^ int.from_bytes(self.key_state.master_seed[:8], 'big')
+        ))
+        
+        # Process in chunks
+        chunk_size = self.MAX_CHUNK_SIZE
+        entropy_generated = 0
+        real_idx = 0
+        real_pos_idx = 0
+        
+        for chunk_start in range(0, output_size, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, output_size)
+            chunk_output = bytearray(chunk_end - chunk_start)
+            chunk_entropy_needed = 0
+            
+            # Count how many entropy bytes we need in this chunk
+            for i in range(chunk_start, chunk_end):
+                if real_pos_idx < len(real_positions) and i == real_positions[real_pos_idx]:
+                    # Real bit position
+                    real_pos_idx += 1
+                else:
+                    # Entropy position
+                    chunk_entropy_needed += 1
+            
+            # Generate entropy for this chunk
+            if chunk_entropy_needed > 0:
+                entropy_chunk = entropy_rng.integers(
+                    0, 256, size=chunk_entropy_needed, dtype=np.uint8
+                )
+                entropy_idx = 0
+            
+            # Fill the chunk
+            chunk_real_idx = 0
+            real_pos_idx = 0  # Reset for this chunk's range
+            
+            for i in range(chunk_start, chunk_end):
+                local_i = i - chunk_start
+                if real_pos_idx < len(real_positions) and i == real_positions[real_pos_idx]:
+                    # Real bit
+                    chunk_output[local_i] = real_bits[real_idx]
+                    real_idx += 1
+                    real_pos_idx += 1
+                else:
+                    # Entropy bit
+                    chunk_output[local_i] = entropy_chunk[entropy_idx]
+                    entropy_idx += 1
+            
+            output.write(chunk_output)
+        
+        return output.getvalue()
     
     def unmix(self, mixed_bits: bytes, coordinate: DimensionalCoordinate, 
               original_size: int) -> bytes:
@@ -469,7 +574,14 @@ class DimensionalScatterEngine:
     This is the heart of ΣVAULT — where files cease to exist as
     contiguous byte sequences and become dispersed probability
     clouds in dimensional space.
+    
+    Phase 3: Added streaming capabilities for memory-bounded operations
+    on large files (>100MB) to prevent memory exhaustion.
     """
+    
+    # Memory limits for streaming operations
+    MAX_FILE_SIZE_IN_MEMORY = 100 * 1024 * 1024  # 100MB threshold
+    STREAM_CHUNK_SIZE = 64 * 1024  # 64KB chunks for streaming
     
     def __init__(self, key_state: KeyState, medium_size: int):
         self.key_state = key_state
@@ -492,6 +604,14 @@ class DimensionalScatterEngine:
         Returns:
             ScatteredFile containing all information needed for reconstruction
         """
+        # Use streaming for large files
+        if len(content) > self.MAX_FILE_SIZE_IN_MEMORY:
+            return self._scatter_streaming(file_id, content)
+        
+        return self._scatter_in_memory(file_id, content)
+    
+    def _scatter_in_memory(self, file_id: bytes, content: bytes) -> 'ScatteredFile':
+        """Original in-memory scattering for smaller files."""
         # Generate topology from content
         topo = self.topology.generate_topology(content)
         
@@ -517,6 +637,64 @@ class DimensionalScatterEngine:
             shard_coordinates=scattered_shards,
             temporal_modifier=temporal_mod,
         )
+    
+    def _scatter_streaming(self, file_id: bytes, content: bytes) -> 'ScatteredFile':
+        """
+        Streaming version of scatter for large files.
+        Processes content in chunks to avoid memory exhaustion.
+        """
+        # For streaming, we need to generate topology from a sample
+        # Use first 32KB as bootstrap for topology generation
+        bootstrap_size = min(32 * 1024, len(content))
+        bootstrap = content[:bootstrap_size]
+        
+        # Generate topology from bootstrap
+        topo = self.topology.generate_topology(bootstrap)
+        
+        # Get temporal modifier
+        temporal_mod = self.temporal.get_temporal_modifier()
+        
+        # Create holographic shards by streaming
+        shards = self._create_shards_streaming(content)
+        
+        # Scatter each shard (shards are already in memory as they're smaller)
+        scattered_shards = []
+        for shard_idx, shard in enumerate(shards):
+            shard_coords = self._scatter_shard(
+                shard, shard_idx, topo, temporal_mod, file_id
+            )
+            scattered_shards.append(shard_coords)
+        
+        return ScatteredFile(
+            file_id=file_id,
+            original_size=len(content),
+            scatter_time=time.time(),
+            topology=topo,
+            shard_coordinates=scattered_shards,
+            temporal_modifier=temporal_mod,
+        )
+    
+    def _create_shards_streaming(self, content: bytes) -> List[bytes]:
+        """
+        Create holographic shards by streaming through content.
+        """
+        num_shards = 8  # Default from HolographicRedundancy
+        
+        # Calculate shard sizes
+        total_size = len(content)
+        base_shard_size = total_size // num_shards
+        remainder = total_size % num_shards
+        
+        shards = []
+        offset = 0
+        
+        for i in range(num_shards):
+            shard_size = base_shard_size + (1 if i < remainder else 0)
+            shard = content[offset:offset + shard_size]
+            shards.append(shard)
+            offset += shard_size
+        
+        return shards
     
     def _scatter_shard(self, shard: bytes, shard_idx: int, 
                        topo: ScatterTopology, temporal_mod: int,
@@ -552,21 +730,21 @@ class DimensionalScatterEngine:
             shard_idx * total_chunks * 1000 +
             topo.scatter_pattern[chunk_idx % len(topo.scatter_pattern)] * 100 +
             chunk_idx
-        )
+        ) & 0xFFFFFFFFFFFFFFFF  # Ensure uint64 range
         
-        temporal = topo.offsets.temporal_offset ^ temporal_mod
+        temporal = (topo.offsets.temporal_offset ^ temporal_mod) & 0xFFFFFFFFFFFFFFFF
         
         entropic = (
             topo.offsets.entropic_seed ^
             (chunk_idx * 0x5851F42D4C957F2D)  # Large prime multiplier
-        )
+        ) & 0xFFFFFFFFFFFFFFFF
         
         semantic = (
             topo.offsets.semantic_key ^
             int.from_bytes(hashlib.md5(file_id).digest()[:8], 'big')
-        )
+        ) & 0xFFFFFFFFFFFFFFFF
         
-        fractal = topo.offsets.fractal_pattern[chunk_idx % len(topo.offsets.fractal_pattern)]
+        fractal = topo.offsets.fractal_pattern[chunk_idx % len(topo.offsets.fractal_pattern)] & 0xFFFFFFFFFFFFFFFF
         
         phase = (
             topo.offsets.phase_angles[shard_idx % len(topo.offsets.phase_angles)] +
@@ -576,9 +754,9 @@ class DimensionalScatterEngine:
         topological = (
             topo.offsets.topology_graph_seed ^
             (shard_idx << 16) ^ chunk_idx
-        )
+        ) & 0xFFFFFFFFFFFFFFFF
         
-        holographic = shard_idx
+        holographic = shard_idx & 0xFFFFFFFFFFFFFFFF
         
         return DimensionalCoordinate(
             spatial=spatial,
@@ -596,6 +774,14 @@ class DimensionalScatterEngine:
         Gather a scattered file back into contiguous bytes.
         The inverse of scatter().
         """
+        # Use streaming for large files
+        if scattered.original_size > self.MAX_FILE_SIZE_IN_MEMORY:
+            return self._gather_streaming(scattered)
+        
+        return self._gather_in_memory(scattered)
+    
+    def _gather_in_memory(self, scattered: 'ScatteredFile') -> bytes:
+        """Original in-memory gathering for smaller files."""
         # Reconstruct each shard
         shards = []
         
@@ -615,6 +801,37 @@ class DimensionalScatterEngine:
                 shard_chunks.append(original)
             
             shards.append(b''.join(shard_chunks))
+        
+        # Reconstruct from shards
+        content = self.holographic.reconstruct(shards, scattered.original_size)
+        
+        return content
+    
+    def _gather_streaming(self, scattered: 'ScatteredFile') -> bytes:
+        """
+        Streaming version of gather for large files.
+        Reconstructs content in chunks to avoid memory exhaustion.
+        """
+        # For streaming reconstruction, we need to build shards incrementally
+        num_shards = len(scattered.shard_coordinates)
+        shard_streams = [io.BytesIO() for _ in range(num_shards)]
+        
+        # Process each shard's coordinates
+        for shard_idx, shard_coords in enumerate(scattered.shard_coordinates):
+            for item in shard_coords:
+                if len(item) == 3:
+                    coord, mixed_data, original_chunk_size = item
+                else:
+                    coord, mixed_data = item
+                    # Fallback: estimate from entropy ratio
+                    original_chunk_size = int(len(mixed_data) * self.key_state.entropy_ratio)
+                
+                # Unmix chunk
+                original = self.mixer.unmix(mixed_data, coord, original_chunk_size)
+                shard_streams[shard_idx].write(original)
+        
+        # Convert streams to bytes
+        shards = [stream.getvalue() for stream in shard_streams]
         
         # Reconstruct from shards
         content = self.holographic.reconstruct(shards, scattered.original_size)
