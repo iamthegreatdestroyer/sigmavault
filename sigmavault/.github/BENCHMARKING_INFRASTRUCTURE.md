@@ -14,12 +14,12 @@ This document establishes the benchmarking framework for ΣVAULT Phase 1. Perfor
 
 **Performance Targets (Phase 1):**
 
-| Input Size | Target Time | Target Throughput | Status |
-|---|---|---|---|
-| 1 KB | < 1 ms | 1 GB/s | To measure |
-| 1 MB | < 10 ms | 100 MB/s | To measure |
-| 1 GB | < 100 s | 10 MB/s | To measure |
-| 1 TB | < 1000 s (16 min) | 1 MB/s | To measure |
+| Input Size | Target Time       | Target Throughput | Status     |
+| ---------- | ----------------- | ----------------- | ---------- |
+| 1 KB       | < 1 ms            | 1 GB/s            | To measure |
+| 1 MB       | < 10 ms           | 100 MB/s          | To measure |
+| 1 GB       | < 100 s           | 10 MB/s           | To measure |
+| 1 TB       | < 1000 s (16 min) | 1 MB/s            | To measure |
 
 ---
 
@@ -73,7 +73,7 @@ from pathlib import Path
 
 class TestFileGenerator:
     """Generate test files efficiently without disk overhead."""
-    
+
     @staticmethod
     def create_sparse_file(path: Path, size: int) -> Path:
         """Create sparse file (doesn't actually allocate all disk space)."""
@@ -82,7 +82,7 @@ class TestFileGenerator:
             f.seek(size - 1)
             f.write(b'\x00')
         return path
-    
+
     @staticmethod
     def create_random_file(path: Path, size: int, chunk_size: int = 1024*1024) -> Path:
         """Create file filled with random data (for compression testing)."""
@@ -94,7 +94,7 @@ class TestFileGenerator:
                 f.write(secrets.token_bytes(chunk))
                 remaining -= chunk
         return path
-    
+
     @staticmethod
     def create_patterns_file(path: Path, size: int) -> Path:
         """Create file with patterns (tests compression, entropy)."""
@@ -162,7 +162,7 @@ class BenchmarkResult:
     elapsed_time: float
     elapsed_time_human: str
     throughput_mbps: float
-    
+
     def to_dict(self):
         return {
             'input_size': self.input_size,
@@ -174,34 +174,34 @@ class BenchmarkResult:
 
 class ScatterBenchmark:
     """Benchmark dimensional scatter operations."""
-    
+
     def __init__(self):
         self.scatter = DimensionalScatter()
         self.results = []
-    
+
     def benchmark_size(self, size: int, iterations: int = 5) -> BenchmarkResult:
         """Benchmark scatter for specific file size."""
-        
+
         # Create test data
         test_data = bytes(size)  # Zeros are fast to create
-        
+
         # Warm up JIT
         self.scatter.scatter_data(test_data)
-        
+
         # Time the operation
         total_time = 0
         for _ in range(iterations):
             start = timeit.default_timer()
             self.scatter.scatter_data(test_data)
             total_time += timeit.default_timer() - start
-        
+
         avg_time = total_time / iterations
         throughput = size / avg_time / 1_000_000  # MB/s
-        
+
         # Format human-readable
         size_human = self._format_size(size)
         time_human = self._format_time(avg_time)
-        
+
         result = BenchmarkResult(
             input_size=size,
             input_size_human=size_human,
@@ -209,10 +209,10 @@ class ScatterBenchmark:
             elapsed_time_human=time_human,
             throughput_mbps=throughput
         )
-        
+
         self.results.append(result)
         return result
-    
+
     @staticmethod
     def _format_size(size: int) -> str:
         """Format bytes to human readable."""
@@ -220,7 +220,7 @@ class ScatterBenchmark:
             if size >= divisor:
                 return f"{size / divisor:.2f} {unit}"
         return f"{size} B"
-    
+
     @staticmethod
     def _format_time(seconds: float) -> str:
         """Format seconds to human readable."""
@@ -233,7 +233,7 @@ class ScatterBenchmark:
         else:
             minutes = seconds / 60
             return f"{minutes:.2f} min"
-    
+
     def print_results(self):
         """Print benchmark results in table format."""
         print("\n" + "="*80)
@@ -241,12 +241,12 @@ class ScatterBenchmark:
         print("="*80)
         print(f"{'Input Size':<15} {'Time':<15} {'Throughput':<15}")
         print("-"*80)
-        
+
         for result in self.results:
             print(f"{result.input_size_human:<15} {result.elapsed_time_human:<15} {result.throughput_mbps:>10.2f} MB/s")
-        
+
         print("="*80)
-    
+
     def save_results(self, output_file: Path):
         """Save results to JSON."""
         data = {
@@ -262,7 +262,7 @@ def test_benchmark_scatter_1kb(benchmark, test_file_1kb):
     """Benchmark 1KB scatter operation."""
     with open(test_file_1kb, 'rb') as f:
         data = f.read()
-    
+
     result = benchmark(DimensionalScatter().scatter_data, data)
     assert result is not None
 
@@ -270,7 +270,7 @@ def test_benchmark_scatter_1mb(benchmark, test_file_1mb):
     """Benchmark 1MB scatter operation."""
     with open(test_file_1mb, 'rb') as f:
         data = f.read()
-    
+
     result = benchmark(DimensionalScatter().scatter_data, data)
     assert result is not None
 
@@ -278,13 +278,13 @@ def test_benchmark_scatter_1mb(benchmark, test_file_1mb):
 
 if __name__ == "__main__":
     bench = ScatterBenchmark()
-    
+
     # Run benchmarks
     print("\nRunning scatter benchmarks...")
     bench.benchmark_size(1024, iterations=10)          # 1 KB
     bench.benchmark_size(1024*1024, iterations=5)      # 1 MB
     bench.benchmark_size(10*1024*1024, iterations=3)   # 10 MB
-    
+
     bench.print_results()
     bench.save_results(Path("benchmarks/reports/scatter_results.json"))
 ```
@@ -300,7 +300,7 @@ from pathlib import Path
 
 class TestScatterPerformance:
     """Verify scatter performance meets targets."""
-    
+
     @pytest.fixture(autouse=True)
     def load_baseline(self):
         """Load baseline metrics."""
@@ -309,47 +309,47 @@ class TestScatterPerformance:
             self.baseline = json.loads(baseline_file.read_text())
         else:
             self.baseline = None
-    
+
     def test_scatter_1kb_performance(self, benchmark, test_file_1kb):
         """1KB must scatter in < 1ms."""
         from sigmavault.core.dimensional_scatter import DimensionalScatter
-        
+
         with open(test_file_1kb, 'rb') as f:
             data = f.read()
-        
+
         result = benchmark(DimensionalScatter().scatter_data, data)
-        
+
         # Assert performance target
         elapsed = benchmark.stats.stats.mean  # pytest-benchmark mean
         assert elapsed < 0.001, f"1KB scatter took {elapsed*1000:.2f}ms (target: 1ms)"
-    
+
     def test_scatter_1mb_performance(self, benchmark, test_file_1mb):
         """1MB must scatter in < 10ms."""
         from sigmavault.core.dimensional_scatter import DimensionalScatter
-        
+
         with open(test_file_1mb, 'rb') as f:
             data = f.read()
-        
+
         result = benchmark(DimensionalScatter().scatter_data, data)
-        
+
         elapsed = benchmark.stats.stats.mean
         assert elapsed < 0.010, f"1MB scatter took {elapsed*1000:.2f}ms (target: 10ms)"
-    
+
     def test_scatter_no_regression(self, benchmark, test_file_1mb):
         """Verify no performance regression from baseline."""
         from sigmavault.core.dimensional_scatter import DimensionalScatter
-        
+
         if self.baseline is None:
             pytest.skip("No baseline metrics available")
-        
+
         with open(test_file_1mb, 'rb') as f:
             data = f.read()
-        
+
         result = benchmark(DimensionalScatter().scatter_data, data)
-        
+
         current = benchmark.stats.stats.mean
         baseline = self.baseline['scatter']['1mb']['elapsed_time']
-        
+
         # Allow 10% regression tolerance
         max_allowed = baseline * 1.10
         assert current < max_allowed, \
@@ -370,11 +370,11 @@ from pathlib import Path
 
 class FlameGraphGenerator:
     """Generate flame graphs from performance profiling."""
-    
+
     @staticmethod
     def generate_scatter_profile():
         """Profile scatter operation and generate flame graph."""
-        
+
         # Create test script
         test_script = """
 import sys
@@ -387,10 +387,10 @@ scatter = DimensionalScatter()
 for _ in range(100):
     scatter.scatter_data(test_data)
 """
-        
+
         script_path = Path("benchmarks/scatter/_profile_script.py")
         script_path.write_text(test_script)
-        
+
         # Run py-spy
         output_file = Path("benchmarks/reports/scatter_profile.txt")
         cmd = [
@@ -399,15 +399,15 @@ for _ in range(100):
             "-f", "flamegraph",
             "--", "python", str(script_path)
         ]
-        
+
         print(f"Running profiler: {' '.join(cmd)}")
         result = subprocess.run(cmd)
-        
+
         if result.returncode == 0:
             print(f"✓ Flame graph saved: {output_file}")
         else:
             print(f"✗ Profiling failed")
-        
+
         script_path.unlink()
 ```
 
@@ -422,17 +422,17 @@ from pathlib import Path
 
 class MemoryBenchmark:
     """Memory usage analysis."""
-    
+
     @profile
     def scatter_memory_usage(self, size: int):
         """Profile memory usage during scatter."""
         from sigmavault.core.dimensional_scatter import DimensionalScatter
-        
+
         scatter = DimensionalScatter()
         data = bytes(size)
         scattered = scatter.scatter_data(data)
         return scattered
-    
+
     def run_memory_benchmark(self):
         """Run memory benchmarks for various sizes."""
         sizes = [
@@ -440,7 +440,7 @@ class MemoryBenchmark:
             (1024*1024, "1 MB"),
             (10*1024*1024, "10 MB"),
         ]
-        
+
         for size, label in sizes:
             print(f"\nMemory usage for {label}:")
             self.scatter_memory_usage(size)
@@ -515,6 +515,7 @@ class MemoryBenchmark:
 ### Phase 1 (Current - Dec 11 - Jan 8)
 
 **Baseline Establishment:**
+
 - ✅ Measure current performance
 - ✅ Identify bottlenecks
 - ⏳ Document optimization opportunities
@@ -524,6 +525,7 @@ class MemoryBenchmark:
 ### Phase 2 (Jan 9 - Feb 19)
 
 **Algorithm Optimization:**
+
 - Vectorize dimensional projections (NumPy)
 - Cache computation results
 - Parallel scatter operations (multiprocessing)
@@ -533,6 +535,7 @@ class MemoryBenchmark:
 ### Phase 3 (Feb 20 - Apr 2)
 
 **Memory Optimization:**
+
 - Streaming algorithms (avoid loading entire file)
 - Memory-mapped I/O
 - Garbage collection tuning
@@ -542,6 +545,7 @@ class MemoryBenchmark:
 ### Phase 10 (Kernel Module)
 
 **System-Level Optimization:**
+
 - Kernel module eliminates FUSE overhead (10x)
 - Direct system call optimization
 - Hardware acceleration support
@@ -565,23 +569,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      
+
       - uses: actions/setup-python@v2
         with:
-          python-version: '3.10'
-      
+          python-version: "3.10"
+
       - name: Install dependencies
         run: |
           pip install -r requirements-benchmark.txt
-      
+
       - name: Run benchmarks
         run: |
           pytest benchmarks/ -v --benchmark-json=output.json
-      
+
       - name: Compare to baseline
         run: |
           pytest benchmarks/scatter/test_scatter_perf.py -v
-      
+
       - name: Comment PR with results
         uses: actions/github-script@v6
         with:
@@ -623,10 +627,12 @@ When optimizing performance:
 ## Optimization Priorities
 
 1. **Critical:** 1TB performance (24.8 hours → 16 minutes)
+
    - Estimated effort: 2 weeks
    - Expected improvement: 90x via streaming + parallelization
 
 2. **High:** 1GB performance optimization
+
    - Current: 87.3s, Target: 50s (Phase 2)
    - Strategy: NumPy vectorization + caching
 

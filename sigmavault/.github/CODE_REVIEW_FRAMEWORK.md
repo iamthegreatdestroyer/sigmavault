@@ -36,22 +36,27 @@ This document establishes the code review process, checklist, and standards for 
 
 ```markdown
 ## Description
+
 [What does this PR do? Why is it necessary?]
 
 ## Related Issues
+
 Closes #123
 
 ## Changes
+
 - [Specific change 1]
 - [Specific change 2]
 - [Specific change 3]
 
 ## Testing
+
 - [x] Unit tests added
 - [x] Integration tests pass
 - [x] Manual testing completed
 
 ## Type of Change
+
 - [ ] New feature
 - [ ] Bug fix
 - [ ] Code refactoring
@@ -59,6 +64,7 @@ Closes #123
 - [ ] Security improvement
 
 ## Checklist
+
 - [ ] Code follows project style
 - [ ] Tests cover changes (>90% coverage)
 - [ ] Documentation updated
@@ -78,12 +84,12 @@ Closes #123
 
 **Review SLA (Service Level Agreement):**
 
-| Priority | Target | Escalation |
-|---|---|---|
-| Critical (security/crash) | 1 hour | Immediate to @ARCHITECT |
-| High (performance/core) | 4 hours | After 2 hours if stuck |
-| Normal (feature/docs) | 24 hours | After 12 hours if stuck |
-| Low (comments/refactor) | 48 hours | After 24 hours if stuck |
+| Priority                  | Target   | Escalation              |
+| ------------------------- | -------- | ----------------------- |
+| Critical (security/crash) | 1 hour   | Immediate to @ARCHITECT |
+| High (performance/core)   | 4 hours  | After 2 hours if stuck  |
+| Normal (feature/docs)     | 24 hours | After 12 hours if stuck |
+| Low (comments/refactor)   | 48 hours | After 24 hours if stuck |
 
 ### Phase 3: Detailed Review
 
@@ -101,6 +107,7 @@ For **each file changed**, reviewer checks:
 - [ ] Off-by-one errors absent
 
 **Example Questions:**
+
 - What happens if the file is 0 bytes?
 - What happens if the key is malformed?
 - Can this loop fail if N is 0?
@@ -119,6 +126,7 @@ For **each file changed**, reviewer checks:
 - [ ] No information disclosure in error messages
 
 **Crypto-Specific Security Questions:**
+
 - Is this using industry-standard algorithms?
 - Could frequency analysis attack this?
 - Are dimensions properly isolated (ADR-002)?
@@ -135,6 +143,7 @@ For **each file changed**, reviewer checks:
 - [ ] Large data structures not duplicated unnecessarily
 
 **Performance Questions:**
+
 - How does this scale for 1GB files?
 - Is there unnecessary iteration over scatter coordinates?
 - Could we cache this dimensional projection?
@@ -150,6 +159,7 @@ For **each file changed**, reviewer checks:
 - [ ] Coverage metric appropriate for code type (90%+ for core)
 
 **Testing Questions:**
+
 - If I change this line of code, does a test fail?
 - What happens if dimensional projection fails?
 - Are we testing all error paths?
@@ -167,6 +177,7 @@ For **each file changed**, reviewer checks:
 - [ ] Follows project coding standards
 
 **Maintainability Questions:**
+
 - Would I understand this code in 6 months?
 - Are variable names descriptive?
 - Is this dimensional projection formula documented?
@@ -182,6 +193,7 @@ For **each file changed**, reviewer checks:
 - [ ] API contracts maintained
 
 **Architecture Questions:**
+
 - Does this follow ADR-001 (dimensional independence)?
 - Is this properly isolated between layers?
 - Could this affect other modules?
@@ -202,12 +214,12 @@ For **each file changed**, reviewer checks:
 
 **Comment Types:**
 
-| Type | Symbol | Expectation |
-|---|---|---|
-| Blocker | 🛑 | MUST be fixed before merge |
-| Important | ⚠️ | Should be fixed (rare exceptions) |
-| Nice-to-have | 💡 | Consider improving, not required |
-| FYI | 📝 | Just noting for information |
+| Type         | Symbol | Expectation                       |
+| ------------ | ------ | --------------------------------- |
+| Blocker      | 🛑     | MUST be fixed before merge        |
+| Important    | ⚠️     | Should be fixed (rare exceptions) |
+| Nice-to-have | 💡     | Consider improving, not required  |
+| FYI          | 📝     | Just noting for information       |
 
 **Good Review Comment Examples:**
 
@@ -235,6 +247,7 @@ For **each file changed**, reviewer checks:
 **Author:** Addresses feedback
 
 For each comment:
+
 1. Either implement the suggestion
 2. Or explain why it's not needed (valid reason required)
 3. Reply to comment acknowledging resolution
@@ -272,43 +285,51 @@ For each comment:
 ## Code Review Checklist - [PR Title]
 
 ### Correctness
+
 - [ ] Logic is correct
 - [ ] Edge cases handled
 - [ ] No obvious errors
 
-### Security  
+### Security
+
 - [ ] No hardcoded secrets
 - [ ] Input validation present
 - [ ] Crypto operations sound
 - [ ] No timing attacks
 
 ### Performance
+
 - [ ] No unnecessary O(n²)
 - [ ] No allocation overhead
 - [ ] Meets dimensional targets
 
 ### Testing
+
 - [ ] Adequate test coverage
 - [ ] Tests validate behavior
 - [ ] No flaky tests
 
 ### Maintainability
+
 - [ ] Code readable
 - [ ] Comments explain why
 - [ ] Type hints complete
 - [ ] No duplication
 
 ### Architecture
+
 - [ ] Follows ADRs
 - [ ] Component boundaries OK
 - [ ] API stable
 
 ### Documentation
+
 - [ ] Docstrings present
 - [ ] Complex sections explained
 - [ ] Examples if needed
 
 ### Overall Assessment
+
 - [ ] Approved
 - [ ] Approved with minor notes
 - [ ] Requested changes
@@ -323,11 +344,13 @@ For each comment:
 **Special Focus Areas:**
 
 1. **Dimensional Independence**
+
    - Each dimension must be orthogonal
    - No information leakage between coordinates
    - Verify ADR-001 compliance
 
 2. **Non-Linear Mixing**
+
    - Projection must be non-reversible without key
    - Frequency analysis impossible
    - Entropy preservation verified
@@ -338,6 +361,7 @@ For each comment:
    - Proof of properties where relevant
 
 **Review Requirements:**
+
 - [ ] Mathematical correctness verified by @AXIOM
 - [ ] Performance profiled by @VELOCITY
 - [ ] Security implications reviewed by @CIPHER
@@ -347,11 +371,13 @@ For each comment:
 **Special Focus Areas:**
 
 1. **Key Derivation Security**
+
    - Argon2id parameters correct
    - Device fingerprint components comprehensive
    - Passphrase entropy adequate
 
 2. **Cryptographic Assumptions**
+
    - Key independence verified
    - Algorithm selection justified
    - Side-channel resistance considered
@@ -362,6 +388,7 @@ For each comment:
    - Key destruction verified
 
 **Review Requirements:**
+
 - [ ] Cryptographic security verified by @CIPHER
 - [ ] Side-channel analysis by @FORTRESS
 - [ ] Implementation reviewed by @APEX
@@ -371,11 +398,13 @@ For each comment:
 **Special Focus Areas:**
 
 1. **FUSE Protocol Compliance**
+
    - Operations implement semantics correctly
    - Error handling matches FUSE spec
    - Concurrent operations safe
 
 2. **Transparency Guarantees**
+
    - Virtual files appear normal
    - Metadata correctly reported
    - Symlink behavior defined
@@ -386,6 +415,7 @@ For each comment:
    - No unnecessary context switches
 
 **Review Requirements:**
+
 - [ ] FUSE semantics verified by @APEX
 - [ ] Performance analyzed by @VELOCITY
 - [ ] Cross-platform compatibility tested
@@ -395,11 +425,13 @@ For each comment:
 **Special Focus Areas:**
 
 1. **Test Quality**
+
    - Tests actually verify behavior
    - Edge cases covered
    - Property-based tests comprehensive
 
 2. **Coverage**
+
    - All code paths tested
    - Error conditions tested
    - Dimensional algorithms thoroughly tested
@@ -410,6 +442,7 @@ For each comment:
    - Mocks appropriate
 
 **Review Requirements:**
+
 - [ ] Test coverage adequate (90%+)
 - [ ] Property tests comprehensive by @ECLIPSE
 - [ ] Edge cases identified
@@ -421,6 +454,7 @@ For each comment:
 ### Issue 1: Timing Attacks in Key Derivation
 
 **Pattern:**
+
 ```python
 # ❌ BAD: Timing depends on key value
 for i in range(256):
@@ -431,6 +465,7 @@ for i in range(256):
 ```
 
 **Fix:**
+
 ```python
 # ✅ GOOD: Constant-time comparison
 import secrets
@@ -440,6 +475,7 @@ is_valid = secrets.compare_digest(key, expected)
 ### Issue 2: Frequency Analysis Leakage
 
 **Pattern:**
+
 ```python
 # ❌ BAD: File size reveals file size
 file_size = len(virtual_data)
@@ -447,6 +483,7 @@ scatter_this(file_size)  # Attacker can observe
 ```
 
 **Fix:**
+
 ```python
 # ✅ GOOD: Encrypt metadata
 encrypted_size = encrypt(len(virtual_data), key)
@@ -456,12 +493,14 @@ scatter_this(encrypted_size)
 ### Issue 3: Dimensional Independence Violation
 
 **Pattern:**
+
 ```python
 # ❌ BAD: Dimensions coupled
 temporal_coord = spatial_coord * passphrase_hash
 ```
 
 **Fix:**
+
 ```python
 # ✅ GOOD: Independent key material
 spatial_key = key[0:64]
@@ -473,6 +512,7 @@ temporal_coord = derive_with_key(temporal_key)
 ### Issue 4: Missing Edge Case Testing
 
 **Pattern:**
+
 ```python
 # ❌ BAD: No test for empty input
 def scatter_data(data):
@@ -482,6 +522,7 @@ def scatter_data(data):
 ```
 
 **Fix:**
+
 ```python
 # ✅ GOOD: Property-based test covers all sizes
 @given(st.lists(st.integers()))
@@ -493,6 +534,7 @@ def test_scatter_any_size(data):
 ### Issue 5: Performance Regression
 
 **Pattern:**
+
 ```python
 # ❌ BAD: O(n²) where O(n) sufficient
 for bit in bits:
@@ -502,6 +544,7 @@ for bit in bits:
 ```
 
 **Fix:**
+
 ```python
 # ✅ GOOD: O(n) direct computation
 coordinate_map = build_map(all_coordinates)
@@ -529,6 +572,7 @@ print(f"1MB scatter: {time_ms:.2f} ms")
 ```
 
 **Target Metrics:**
+
 - 1KB scatter/gather: < 1ms
 - 1MB scatter/gather: < 10ms
 - 1GB scatter/gather: < 100s
@@ -561,13 +605,13 @@ If reviewer finds **potential vulnerability**:
 
 **Track quarterly:**
 
-| Metric | Target | Measurement |
-|---|---|---|
-| Review SLA compliance | 95% | % of PRs reviewed within SLA |
-| Approval cycles | ≤2 | Average review cycles before merge |
-| Rework rate | <10% | % of PRs requiring rework |
-| Security issues found | →0 | Issues caught in review vs. production |
-| Test coverage | 90%+ | Lines of code covered by tests |
+| Metric                | Target | Measurement                            |
+| --------------------- | ------ | -------------------------------------- |
+| Review SLA compliance | 95%    | % of PRs reviewed within SLA           |
+| Approval cycles       | ≤2     | Average review cycles before merge     |
+| Rework rate           | <10%   | % of PRs requiring rework              |
+| Security issues found | →0     | Issues caught in review vs. production |
+| Test coverage         | 90%+   | Lines of code covered by tests         |
 
 ---
 
@@ -646,6 +690,7 @@ Merge to main
 ### This Week
 
 - [ ] Review existing core modules:
+
   - `core/dimensional_scatter.py` (642 lines)
   - `crypto/hybrid_key.py` (650 lines)
   - `filesystem/fuse_layer.py` (1032 lines)
