@@ -12,12 +12,14 @@
 ΣVAULT must present encrypted files to the operating system in a transparent, usable manner. The architectural decision is: **How should we present the virtual filesystem to users?**
 
 Options range from:
+
 1. **FUSE Library** (userspace filesystem) - Portable, slower
 2. **Kernel Module** (kernel-mode filesystem) - Fast, platform-specific
 3. **Block Device** (encrypted block layer) - Traditional, limited transparency
 4. **Container** (VM-based filesystem) - Heavy, isolated
 
 The choice affects:
+
 - Transparency (invisible to applications?)
 - Performance (throughput, latency)
 - Portability (Linux, Windows, macOS support)
@@ -52,23 +54,23 @@ Physical Storage (scattered bits)
 ```python
 class SigmaVaultFS(Operations):
     """FUSE filesystem for transparent scatter/gather operations"""
-    
+
     def __init__(self, key_state, storage_path):
         self.key_state = key_state
         self.storage_path = storage_path
         self.scatter_engine = DimensionalScatterEngine(key_state)
-    
+
     def mount(self, mount_point):
         """Mount FUSE filesystem at mount_point"""
         FUSE(self, mount_point, nothreads=True, foreground=True)
-    
+
     def read(self, path, size, offset, fh):
         """Scatter: Read from virtual file → gather from storage"""
         virtual_data = self.get_virtual_entry(path)
         scattered_bytes = self.scatter_engine.scatter(virtual_data, path)
         physical_data = self.read_scattered(scattered_bytes, offset, size)
         return self.scatter_engine.gather(physical_data, path)[:size]
-    
+
     def write(self, path, data, offset, fh):
         """Write to virtual file → scatter to storage"""
         scattered_bytes = self.scatter_engine.scatter(data, path)
@@ -78,15 +80,15 @@ class SigmaVaultFS(Operations):
 
 ### Transparency Guarantees
 
-| Operation | Transparency | Implementation |
-|---|---|---|
-| File Read | ✅ Full | Scatter hidden in FUSE layer |
-| File Write | ✅ Full | Write-scatter atomic operation |
-| File Listing | ✅ Full | Virtual entry metadata |
-| File Properties | ✅ Full | stat() returns logical size |
-| Permissions | ✅ Full | POSIX permissions preserved |
-| Symbolic Links | ⚠️ Partial | Relative symlinks only |
-| Hard Links | ❌ None | Not supported (architectural) |
+| Operation       | Transparency | Implementation                 |
+| --------------- | ------------ | ------------------------------ |
+| File Read       | ✅ Full      | Scatter hidden in FUSE layer   |
+| File Write      | ✅ Full      | Write-scatter atomic operation |
+| File Listing    | ✅ Full      | Virtual entry metadata         |
+| File Properties | ✅ Full      | stat() returns logical size    |
+| Permissions     | ✅ Full      | POSIX permissions preserved    |
+| Symbolic Links  | ⚠️ Partial   | Relative symlinks only         |
+| Hard Links      | ❌ None      | Not supported (architectural)  |
 
 ---
 
@@ -103,11 +105,13 @@ Applications → VFS → [Kernel Module - High Performance]
 ```
 
 **Advantages:**
+
 - ✅ Maximum performance (no userspace overhead)
 - ✅ Direct kernel integration
 - ✅ Minimal latency
 
 **Disadvantages:**
+
 - ❌ Requires kernel compilation per version/distro
 - ❌ Requires elevated privileges (root/admin)
 - ❌ Security risk (kernel-mode code is critical)
@@ -128,11 +132,13 @@ Applications → POSIX Filesystem → [Block Device Layer]
 ```
 
 **Advantages:**
+
 - ✅ Works with existing filesystems (ext4, NTFS, etc.)
 - ✅ Standard encryption approach
 - ✅ Proven mature solutions (LUKS, BitLocker)
 
 **Disadvantages:**
+
 - ❌ Opaque files (can't distinguish content types)
 - ❌ No semantic awareness (content-driven scattering impossible)
 - ❌ Less transparent (requires encryption mount/unmount steps)
@@ -154,6 +160,7 @@ Applications → POSIX Filesystem → FUSE Kernel Module
 ```
 
 **Advantages:**
+
 - ✅ Userspace implementation (safe, debuggable)
 - ✅ Portable across Linux, macOS, Windows (WinFsp)
 - ✅ Transparent to applications (looks like regular filesystem)
@@ -163,6 +170,7 @@ Applications → POSIX Filesystem → FUSE Kernel Module
 - ✅ Educational (easier for team to understand)
 
 **Disadvantages:**
+
 - ⚠️ Slight performance overhead (userspace context switches)
 - ⚠️ Requires FUSE daemon running (background service)
 - ⚠️ Platform-specific FUSE implementations (WinFsp, MacFUSE)
@@ -186,11 +194,13 @@ Application → Kernel VFS → FUSE module → Daemon
 **Acceptable Trade-off Because:**
 
 1. **Dimensional Scatter/Gather is Slower Than Direct I/O**
+
    - Scattering 1MB file already ~10ms (dimensional projection cost)
    - FUSE overhead 0.01ms negligible by comparison
    - Bottleneck is crypto, not FUSE
 
 2. **Phase 1 Priority: Correctness Over Speed**
+
    - Need transparent semantics (working before optimizing)
    - Can optimize to kernel module in Phase 10 if needed
    - Acceptable performance for MVP: 1GB file < 100 seconds
@@ -201,6 +211,7 @@ Application → Kernel VFS → FUSE module → Daemon
    - Queue-based batching possible
 
 **Performance Roadmap:**
+
 - Phase 1: FUSE (baseline: 100-200 MB/s)
 - Phase 3: Optimization (target: 200-500 MB/s via SIMD)
 - Phase 4: WinFsp tuning (target: 500+ MB/s)
@@ -210,14 +221,14 @@ Application → Kernel VFS → FUSE module → Daemon
 
 **Why Transparent Filesystem for Phase 1?**
 
-| Aspect | FUSE | Direct API | Pros/Cons |
-|---|---|---|---|
-| User Experience | Seamless (looks like regular files) | Requires custom code | ✅ FUSE |
-| Backup Tools | Works transparently | Need custom integration | ✅ FUSE |
-| Existing Apps | Full compatibility | None (new API) | ✅ FUSE |
-| Performance | 10x slower than kernel | 1x baseline | ✅ Direct |
-| Complexity | Medium (FUSE protocol) | Low (direct calls) | ✅ Direct |
-| Portability | Good (FUSE portable) | Low (custom per platform) | ✅ FUSE |
+| Aspect          | FUSE                                | Direct API                | Pros/Cons |
+| --------------- | ----------------------------------- | ------------------------- | --------- |
+| User Experience | Seamless (looks like regular files) | Requires custom code      | ✅ FUSE   |
+| Backup Tools    | Works transparently                 | Need custom integration   | ✅ FUSE   |
+| Existing Apps   | Full compatibility                  | None (new API)            | ✅ FUSE   |
+| Performance     | 10x slower than kernel              | 1x baseline               | ✅ Direct |
+| Complexity      | Medium (FUSE protocol)              | Low (direct calls)        | ✅ Direct |
+| Portability     | Good (FUSE portable)                | Low (custom per platform) | ✅ FUSE   |
 
 **Decision:** FUSE transparency more important than Phase 1 performance
 
@@ -228,24 +239,28 @@ Application → Kernel VFS → FUSE module → Daemon
 ### Positive Consequences ✅
 
 1. **Seamless Transparency**
+
    - Users see regular files (no learning curve)
    - Existing tools work transparently (ls, cat, vim, grep)
    - Backup applications can backup vault transparently
    - IDE integration automatic (files appear normal)
 
 2. **Portability Across Platforms**
+
    - Linux: fusepy (native FUSE)
    - macOS: MacFUSE + fusepy
    - Windows: WinFsp + fusepy wrapper
    - Single Python codebase works everywhere
 
 3. **Safe Development Environment**
+
    - Bugs don't crash kernel
    - Can debug with print statements
    - Easy to add logging/monitoring
    - Rapid iteration (compile → test cycle in seconds)
 
 4. **Semantic Awareness**
+
    - Can detect file renames (enable re-scattering)
    - Can track file dependencies (topological dimension)
    - Can implement compression transparency
@@ -260,24 +275,28 @@ Application → Kernel VFS → FUSE module → Daemon
 ### Negative Consequences / Trade-offs ⚠️
 
 1. **Performance Overhead**
+
    - Userspace context switches slow
    - 1GB file scatter: ~100 seconds (acceptable for MVP)
    - Not suitable for real-time streaming use case
    - **Mitigation:** Kernel module option in Phase 10, SIMD optimization Phase 3
 
 2. **FUSE Daemon Dependency**
+
    - Background service must be running
    - Service crash unmounts filesystem
    - Adds startup/shutdown complexity
    - **Mitigation:** Service manager integration (systemd, launchd, Task Scheduler)
 
 3. **Platform-Specific FUSE Implementations**
+
    - Linux FUSE: Mature, stable
    - macOS MacFUSE: Less mature, frequent compatibility issues
    - Windows WinFsp: New ecosystem, API inconsistencies
    - **Mitigation:** Comprehensive platform testing, wrapper abstractions
 
 4. **Hard Link Limitation**
+
    - Cannot implement hard links (architectural constraint)
    - Breaks some backup tools expecting hard links
    - Symlinks limited to relative paths
@@ -298,11 +317,13 @@ Application → Kernel VFS → FUSE module → Daemon
 **Approach:** Implement custom Linux kernel module for maximum performance
 
 **Advantages:**
+
 - ✅ Maximum performance (direct kernel integration)
 - ✅ No daemon overhead
 - ✅ Best throughput for large files
 
 **Disadvantages:**
+
 - ❌ Linux-only (needs separate Windows/macOS implementations)
 - ❌ Requires elevated privileges (root)
 - ❌ Significant development effort (kernel programming complex)
@@ -317,11 +338,13 @@ Application → Kernel VFS → FUSE module → Daemon
 **Approach:** Implement encrypted block device layer
 
 **Advantages:**
+
 - ✅ Works with existing filesystems
 - ✅ Proven approach (LUKS, BitLocker exist)
 - ✅ Good performance (block-level encryption)
 
 **Disadvantages:**
+
 - ❌ Cannot implement content-driven scattering
 - ❌ No semantic awareness (treat all data as noise)
 - ❌ Dimensional topology impossible (no file relationships)
@@ -343,11 +366,13 @@ vault.write("file.txt", data)
 ```
 
 **Advantages:**
+
 - ✅ Full control over operations
 - ✅ Minimal overhead
 - ✅ Can optimize per-application
 
 **Disadvantages:**
+
 - ❌ Break transparency (not POSIX filesystem)
 - ❌ Existing tools don't work (need custom implementations)
 - ❌ Steeper learning curve (new API to learn)
@@ -361,11 +386,13 @@ vault.write("file.txt", data)
 **Approach:** Run vault in isolated VM/container with network FUSE
 
 **Advantages:**
+
 - ✅ Isolates vault from system
 - ✅ Easy to manage/update
 - ✅ Better security boundaries
 
 **Disadvantages:**
+
 - ❌ Significant overhead (VM memory, CPU)
 - ❌ Not transparent (mounted filesystem in container)
 - ❌ Complexity for users (requires container runtime)
@@ -378,11 +405,13 @@ vault.write("file.txt", data)
 **Approach:** Use OS-native filesystem filtering API
 
 **Advantages:**
+
 - ✅ Native integration (OS-aware)
 - ✅ Better performance than FUSE
 - ✅ Kernel-integrated semantics
 
 **Disadvantages:**
+
 - ❌ Platform-specific (separate per OS)
 - ❌ Proprietary APIs (limited portability)
 - ❌ Requires elevated privileges
@@ -398,28 +427,31 @@ vault.write("file.txt", data)
 
 **Threats Specific to FUSE:**
 
-| Threat | Scenario | Mitigation |
-|---|---|---|
-| Privilege Escalation | User tricks daemon to access elevated files | Run with user privileges only |
-| Daemon Crash | Attacker sends malformed FUSE requests | Fuzzing + input validation |
-| Timing Attacks | Attacker measures operation duration | Constant-time scatter/gather |
-| Metadata Leaks | Attacker observes file operations | Encrypt metadata in FUSE layer |
-| Path Traversal | Attacker uses symlinks to escape vault | Validate paths, deny external symlinks |
+| Threat               | Scenario                                    | Mitigation                             |
+| -------------------- | ------------------------------------------- | -------------------------------------- |
+| Privilege Escalation | User tricks daemon to access elevated files | Run with user privileges only          |
+| Daemon Crash         | Attacker sends malformed FUSE requests      | Fuzzing + input validation             |
+| Timing Attacks       | Attacker measures operation duration        | Constant-time scatter/gather           |
+| Metadata Leaks       | Attacker observes file operations           | Encrypt metadata in FUSE layer         |
+| Path Traversal       | Attacker uses symlinks to escape vault      | Validate paths, deny external symlinks |
 
 ### Mitigations
 
 1. **Privilege Boundaries**
+
    - FUSE daemon runs as regular user
    - Cannot access system files (unless user can)
    - Vault permissions = user permissions
 
 2. **Input Validation**
+
    - All paths validated against vault root
    - Symlinks restricted to vault directory
    - Special characters escaped
    - Large paths rejected
 
 3. **Constant-Time Operations**
+
    - Scatter/gather timing independent of data
    - Dimensional projections don't leak file size
    - Metadata operations normalized
@@ -445,6 +477,7 @@ vault.write("file.txt", data)
 - [x] Linux FUSE mounting
 
 **Success Criteria:**
+
 - [ ] Transparent file operations work
 - [ ] Test suite achieves 95%+ coverage
 - [ ] No crashes on normal operations
@@ -498,6 +531,48 @@ vault.write("file.txt", data)
 
 - [ADR-001: Dimensional Addressing Strategy](./ADR-001-dimensional-addressing.md)
 - [ADR-002: Hybrid Key Derivation](./ADR-002-hybrid-key-derivation.md)
+
+---
+
+## Review Request
+
+**Status:** REVIEW REQUESTED  
+**Requested:** December 11, 2025  
+**Target Completion:** December 18, 2025  
+
+### Requested Reviews
+
+**@VELOCITY (Performance Lead):**  
+Please review the FUSE filesystem architecture for performance implications and optimization opportunities. Focus on:
+- Throughput and latency characteristics vs alternatives
+- Memory usage patterns and resource consumption
+- Scalability bottlenecks and kernel-userspace overhead
+- Benchmarking strategy and performance targets
+
+**@CIPHER (Security Lead):**  
+Please assess the security implications of the FUSE approach:
+- Attack surface analysis (userspace vs kernel)
+- Privilege escalation risks and sandboxing
+- Information leakage through filesystem operations
+- Integration with hybrid key system security
+
+**@CORE (Low-Level Systems Lead):**  
+Please evaluate the systems-level implementation:
+- FUSE API usage and correctness
+- Cross-platform compatibility (Linux FUSE vs WinFsp)
+- Error handling and filesystem consistency
+- Integration with dimensional scattering engine
+
+### Review Criteria
+- [ ] Performance analysis complete and targets achievable
+- [ ] Security implications understood and mitigated
+- [ ] Cross-platform implementation feasible
+- [ ] Error handling and recovery mechanisms adequate
+- [ ] Integration with other components clear
+- [ ] Documentation and testing plans sufficient
+
+### Response Format
+Please provide review feedback in comments below or via GitHub issues. Use APPROVED/REJECTED/REVISION_REQUIRED status with detailed rationale.
 
 ---
 

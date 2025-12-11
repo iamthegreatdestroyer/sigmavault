@@ -12,6 +12,7 @@
 ΣVAULT's core innovation is transforming encrypted data storage from a binary encryption model to a **probabilistic manifold model**. Instead of asking "is this bit encrypted or plaintext?", we ask "in which dimensional subspace does this bit exist?"
 
 This architectural decision affects:
+
 - Overall security model (entropic indistinguishability)
 - Performance characteristics (dimensional projection cost)
 - Scalability (manifold dimensionality limits)
@@ -29,7 +30,7 @@ The question is: **Why an 8-dimensional manifold instead of alternatives?**
 ```python
 class DimensionalAxis(IntEnum):
     SPATIAL = 0       # File location offset (where)
-    TEMPORAL = 1      # Time-based variation (when)  
+    TEMPORAL = 1      # Time-based variation (when)
     ENTROPIC = 2      # Noise interleaving (signal/noise)
     SEMANTIC = 3      # Content-derived addressing (what)
     FRACTAL = 4       # Recursion depth (self-similarity)
@@ -47,6 +48,7 @@ physical_address = (s × t + e ⊕ sem) × (f × p) ⊕ (top ⊕ h)
 ```
 
 Where:
+
 - $\times$ = multiplication (entropy mixing)
 - $\oplus$ = XOR (dimensional independence)
 - Projection is **non-linear** to prevent frequency analysis attacks
@@ -60,12 +62,14 @@ Where:
 ### 1. Why Not Traditional XOR-Based Encryption?
 
 **XOR-based approaches (DES, standard block ciphers):**
+
 - Known plaintext: Attacker can XOR plaintext ⊕ ciphertext → key bits
 - Frequency analysis: File structure leaks through bit patterns
 - Linear algebra attacks: Multiple ciphertexts reveal linear relationships
 - No inherent noise: Encrypted bits are perfectly distinguishable from unencrypted
 
 **ΣVAULT's 8D approach:**
+
 - Bits don't have a "position" without the correct key
 - Frequency analysis reveals nothing (manifold has uniform distribution)
 - Linear relationships are destroyed (non-linear projection)
@@ -74,6 +78,7 @@ Where:
 ### 2. Why Not Simple Scatter (1D or 2D)?
 
 **Lower-dimensional approaches:**
+
 - 1D scattering (shuffle): Vulnerable to frequency analysis
   - Attacker counts occupied storage blocks → file size leak
   - Pattern reveals compression structure (zeros vs. data)
@@ -82,6 +87,7 @@ Where:
   - Multiple writes leak update patterns
 
 **8D advantages:**
+
 - Orthogonal dimensions interact multiplicatively (8! = 40,320 mixing strategies)
 - Temporal dimension enables re-scattering without changing logical content
 - Topological dimension handles relationships between files
@@ -91,12 +97,12 @@ Where:
 
 **The "magic number" 8 balances:**
 
-| Dimension Count | Storage Overhead | Computational Cost | Security Margin |
-|---|---|---|---|
-| 4D (too low) | 2^4 = 16 possibilities/bit | O(1) fast | Frequency analysis possible |
-| **8D (optimal)** | **2^8 = 256 possibilities/bit** | **O(8) manageable** | **2^8 noise floor** |
-| 16D (excessive) | 2^16 = 65,536 possibilities/bit | O(16) slow | Overkill security |
-| 32D (impractical) | 2^32 overflow | O(32) prohibitive | Architectural limit |
+| Dimension Count   | Storage Overhead                | Computational Cost  | Security Margin             |
+| ----------------- | ------------------------------- | ------------------- | --------------------------- |
+| 4D (too low)      | 2^4 = 16 possibilities/bit      | O(1) fast           | Frequency analysis possible |
+| **8D (optimal)**  | **2^8 = 256 possibilities/bit** | **O(8) manageable** | **2^8 noise floor**         |
+| 16D (excessive)   | 2^16 = 65,536 possibilities/bit | O(16) slow          | Overkill security           |
+| 32D (impractical) | 2^32 overflow                   | O(32) prohibitive   | Architectural limit         |
 
 **Why this optimal point?**
 
@@ -110,6 +116,7 @@ Where:
 **Critical assumption:** Dimensional axes must be **cryptographically independent**
 
 Each dimension derives from disjoint key material:
+
 - SPATIAL: Derived from key bits [0:64]
 - TEMPORAL: Derived from key bits [64:128]
 - ENTROPIC: Derived from key bits [128:192]
@@ -124,6 +131,7 @@ Each dimension derives from disjoint key material:
 ### 5. Entropic Indistinguishability
 
 Without the correct key, an attacker sees:
+
 - 256 random-looking byte storage locations per bit
 - No pattern linking related bits
 - Temporal variance obscuring re-scattering events
@@ -138,21 +146,25 @@ Without the correct key, an attacker sees:
 ### Positive Consequences ✅
 
 1. **Genuine Quantum-like Superposition**
+
    - Data exists in all dimensional states simultaneously (until observed with correct key)
    - No intermediate state (unlike encrypted data that's obviously encrypted)
    - Security by obscuration + mathematical guarantee
 
 2. **Temporal Variance Capability**
+
    - Static files can re-scatter in background without logical change
    - Physical representation changes, logical access remains transparent
    - Enables "living encryption" that adapts over time
 
 3. **Holographic Redundancy**
+
    - Any 50%+ of physical storage can reconstruct full file
    - Distributed resilience without replication overhead
    - Partial corruption recovery automatic
 
 4. **Topological Flexibility**
+
    - Relationship metadata hidden in dimensional projections
    - Graph structure (folder hierarchies) preserved in topology dimension
    - Access patterns don't leak file relationships
@@ -165,21 +177,25 @@ Without the correct key, an attacker sees:
 ### Negative Consequences / Trade-offs ⚠️
 
 1. **Computational Overhead**
+
    - O(8) operations per bit vs. O(1) for simple XOR
    - Dimensional projection slower than AES (but parallelizable)
    - **Mitigation:** GPU acceleration in Phase 3, SIMD in Phase 4
 
 2. **Mathematical Complexity**
+
    - Non-linear projection harder to verify formally
    - Dimensional independence assumptions need cryptanalysis
    - **Mitigation:** Formal verification in Phase 7, peer review in Phase 2
 
 3. **Key Size**
+
    - 512-bit master key required (vs. 256-bit for AES)
    - Increases key storage/transmission overhead
    - **Mitigation:** Hybrid key derivation (device fingerprint compression)
 
 4. **Implementation Difficulty**
+
    - More complex than standard encryption
    - Dimensional mixing requires careful constant-time implementation
    - **Mitigation:** Comprehensive test suite, security audit in Phase 2
@@ -199,12 +215,14 @@ Without the correct key, an attacker sees:
 **Approach:** Use standard NIST-approved encryption
 
 **Advantages:**
+
 - ✅ Proven security (30 years of analysis)
 - ✅ Hardware acceleration (AES-NI)
 - ✅ Fast (cycles per byte)
 - ✅ Industry standard
 
 **Disadvantages:**
+
 - ❌ Encrypted data obviously encrypted (pattern visible)
 - ❌ No temporal variance (static encryption)
 - ❌ Frequency analysis reveals structure
@@ -218,11 +236,13 @@ Without the correct key, an attacker sees:
 **Approach:** Use fully homomorphic encryption for computation on encrypted data
 
 **Advantages:**
+
 - ✅ Compute on encrypted data
 - ✅ Novel mathematical approach
 - ✅ Post-quantum resistant candidates
 
 **Disadvantages:**
+
 - ❌ 1000x performance penalty
 - ❌ Not suitable for storage (only computation)
 - ❌ Impractical for large files
@@ -235,10 +255,12 @@ Without the correct key, an attacker sees:
 **Approach:** Use quantum keys distributed through quantum channels
 
 **Advantages:**
+
 - ✅ Information-theoretically secure
 - ✅ Detects eavesdropping
 
 **Disadvantages:**
+
 - ❌ Requires quantum infrastructure (not available)
 - ❌ Doesn't solve storage problem (only transmission)
 - ❌ No backward compatibility
@@ -251,11 +273,13 @@ Without the correct key, an attacker sees:
 **Approach:** Use fewer dimensions (SPATIAL, TEMPORAL, ENTROPIC, SEMANTIC only)
 
 **Advantages:**
+
 - ✅ 25% faster computation
 - ✅ Simpler implementation
 - ✅ Lower key size (256-bit)
 
 **Disadvantages:**
+
 - ❌ 2^4 = 16 possibilities/bit (weak noise floor)
 - ❌ Frequency analysis more feasible
 - ❌ No holographic redundancy
@@ -268,10 +292,12 @@ Without the correct key, an attacker sees:
 **Approach:** Use more dimensions for additional security
 
 **Advantages:**
+
 - ✅ 2^16 = 65,536 possibilities/bit (massive security margin)
 - ✅ Extreme indistinguishability
 
 **Disadvantages:**
+
 - ❌ O(16) operations per bit (2x slower)
 - ❌ 1024-bit key requirement
 - ❌ Marginal security benefit beyond 8D
@@ -323,22 +349,22 @@ This ADR depends on the following assumptions remaining valid:
 
 ### Core Implementation ✅
 
-| Component | File | Lines | Status |
-|---|---|---|---|
-| DimensionalAxis enum | core/dimensional_scatter.py | 8 | ✅ Implemented |
-| DimensionalCoordinate | core/dimensional_scatter.py | 50 | ✅ Implemented |
-| Dimensional projection | core/dimensional_scatter.py | 120 | ✅ Implemented |
-| to_physical_address() | core/dimensional_scatter.py | 35 | ✅ Implemented |
-| dimensional_mix() | core/dimensional_scatter.py | 45 | ✅ Implemented |
+| Component              | File                        | Lines | Status         |
+| ---------------------- | --------------------------- | ----- | -------------- |
+| DimensionalAxis enum   | core/dimensional_scatter.py | 8     | ✅ Implemented |
+| DimensionalCoordinate  | core/dimensional_scatter.py | 50    | ✅ Implemented |
+| Dimensional projection | core/dimensional_scatter.py | 120   | ✅ Implemented |
+| to_physical_address()  | core/dimensional_scatter.py | 35    | ✅ Implemented |
+| dimensional_mix()      | core/dimensional_scatter.py | 45    | ✅ Implemented |
 
 ### Testing ✅
 
-| Test | File | Lines | Status |
-|---|---|---|---|
-| Dimension enumeration | test_sigmavault.py | 12 | ✅ Passing |
-| Coordinate generation | test_sigmavault.py | 18 | ✅ Passing |
-| Projection invertibility | test_sigmavault.py | 24 | ✅ Passing |
-| Entropy distribution | test_sigmavault.py | 30 | ✅ Passing |
+| Test                     | File               | Lines | Status     |
+| ------------------------ | ------------------ | ----- | ---------- |
+| Dimension enumeration    | test_sigmavault.py | 12    | ✅ Passing |
+| Coordinate generation    | test_sigmavault.py | 18    | ✅ Passing |
+| Projection invertibility | test_sigmavault.py | 24    | ✅ Passing |
+| Entropy distribution     | test_sigmavault.py | 30    | ✅ Passing |
 
 ---
 
@@ -356,6 +382,45 @@ This ADR depends on the following assumptions remaining valid:
 
 - [ADR-002: Hybrid Key Derivation](./ADR-002-hybrid-key-derivation.md)
 - [ADR-003: FUSE Filesystem Layer](./ADR-003-fuse-filesystem.md)
+
+---
+
+## Review Request
+
+**Status:** REVIEW REQUESTED  
+**Requested:** December 11, 2025  
+**Target Completion:** December 18, 2025  
+
+### Requested Reviews
+
+**@ARCHITECT (Architecture Lead):**  
+Please review the dimensional addressing strategy for architectural soundness, scalability implications, and alignment with distributed systems best practices. Focus on:
+- Manifold dimensionality justification (8D vs alternatives)
+- Projection formula complexity and performance impact
+- Integration with FUSE layer and hybrid key system
+
+**@CIPHER (Security Lead):**  
+Please assess the security implications of the 8D manifold approach. Evaluate:
+- Entropic indistinguishability claims
+- Information leakage risks through dimensional analysis
+- Cryptographic assumptions and attack vectors
+
+**@VELOCITY (Performance Lead):**  
+Please analyze performance characteristics and optimization opportunities:
+- Computational complexity of projection operations
+- Memory usage patterns for coordinate storage
+- Scalability bottlenecks and GPU acceleration potential
+
+### Review Criteria
+- [ ] Technical accuracy of dimensional mathematics
+- [ ] Security analysis completeness  
+- [ ] Performance implications understood
+- [ ] Implementation feasibility confirmed
+- [ ] Alternatives adequately considered
+- [ ] Documentation clarity and completeness
+
+### Response Format
+Please provide review feedback in comments below or via GitHub issues. Use APPROVED/REJECTED/REVISION_REQUIRED status with detailed rationale.
 
 ---
 
