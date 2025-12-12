@@ -1,0 +1,239 @@
+{
+  "version": "1.0.0",
+  "created": "2025-12-11",
+  "description": "ΣVAULT Performance Baseline - Phase 3 benchmarks",
+  "python_version": "3.13.7",
+  "platform": "win32",
+  "categories": {
+    "crypto": {
+      "description": "Cryptographic operations performance",
+      "benchmarks": {
+        "sha256_1kb": {
+          "name": "SHA-256 (1 KB)",
+          "mean_ms": 0.062,
+          "median_ms": 0.047,
+          "throughput": 15.8,
+          "throughput_unit": "MB/sec"
+        },
+        "sha256_1mb": {
+          "name": "SHA-256 (1 MB)",
+          "mean_ms": 1.24,
+          "median_ms": 0.92,
+          "throughput": 805,
+          "throughput_unit": "MB/sec"
+        },
+        "sha512_1kb": {
+          "name": "SHA-512 (1 KB)",
+          "mean_ms": 0.066,
+          "median_ms": 0.054,
+          "throughput": 14.8,
+          "throughput_unit": "MB/sec"
+        },
+        "sha512_1mb": {
+          "name": "SHA-512 (1 MB)",
+          "mean_ms": 2.8,
+          "median_ms": 2.53,
+          "throughput": 356,
+          "throughput_unit": "MB/sec"
+        },
+        "pbkdf2_10k": {
+          "name": "PBKDF2-SHA256 (10k iters)",
+          "mean_ms": 10.65,
+          "median_ms": 10.3
+        },
+        "pbkdf2_100k": {
+          "name": "PBKDF2-SHA256 (100k iters)",
+          "mean_ms": 111.2,
+          "median_ms": 105.9
+        },
+        "keystate_derivation": {
+          "name": "KeyState Derivation from Hybrid Key",
+          "mean_ms": 186.4,
+          "median_ms": 182.8,
+          "note": "Includes Argon2id + multi-round PBKDF2"
+        }
+      }
+    },
+    "scatter": {
+      "description": "8D dimensional scattering operations",
+      "benchmarks": {
+        "coordinate_creation": {
+          "name": "Dimensional Coordinate Creation",
+          "mean_ms": 0.129,
+          "median_ms": 0.104
+        },
+        "coordinate_serialize": {
+          "name": "Coordinate Serialization",
+          "mean_ms": 0.032,
+          "median_ms": 0.019
+        },
+        "coordinate_deserialize": {
+          "name": "Coordinate Deserialization",
+          "mean_ms": 0.048,
+          "median_ms": 0.044
+        },
+        "address_projection": {
+          "name": "Physical Address Projection (1GB medium)",
+          "mean_ms": 0.051,
+          "median_ms": 0.046
+        },
+        "entropic_mix_1kb": {
+          "name": "Entropic Mix (1 KB)",
+          "mean_ms": 35.4,
+          "median_ms": 33.4,
+          "throughput": 28.2,
+          "throughput_unit": "KB/sec",
+          "note": "Per-byte HMAC mixing - intentionally slow for security"
+        },
+        "entropic_mix_1mb": {
+          "name": "Entropic Mix (1 MB)",
+          "mean_ms": 40918,
+          "median_ms": 40723,
+          "throughput": 25,
+          "throughput_unit": "KB/sec",
+          "note": "~41 sec/MB - entropy-intensive, not throughput-optimized"
+        },
+        "entropic_unmix_1kb": {
+          "name": "Entropic Unmix (1 KB)",
+          "mean_ms": 0.76,
+          "median_ms": 0.72,
+          "throughput": 1.29,
+          "throughput_unit": "MB/sec"
+        },
+        "entropic_unmix_1mb": {
+          "name": "Entropic Unmix (1 MB)",
+          "mean_ms": 163.4,
+          "median_ms": 162.0,
+          "throughput": 6.12,
+          "throughput_unit": "MB/sec"
+        },
+        "topology_1kb": {
+          "name": "Topology Generation (1 KB file)",
+          "mean_ms": 0.68,
+          "median_ms": 0.56,
+          "throughput": 1.43,
+          "throughput_unit": "MB/sec"
+        },
+        "topology_1mb": {
+          "name": "Topology Generation (1 MB file)",
+          "mean_ms": 0.66,
+          "median_ms": 0.58,
+          "throughput": 1.48,
+          "throughput_unit": "GB/sec"
+        },
+        "full_scatter_1kb": {
+          "name": "Full Scatter (1 KB)",
+          "mean_ms": 23.3,
+          "median_ms": 22.1,
+          "throughput": 42.9,
+          "throughput_unit": "KB/sec"
+        },
+        "full_scatter_1mb": {
+          "name": "Full Scatter (1 MB)",
+          "mean_ms": 42269,
+          "median_ms": 39924,
+          "throughput": 24.2,
+          "throughput_unit": "KB/sec",
+          "note": "~42 sec/MB - dominated by entropic mixing"
+        }
+      }
+    },
+    "filesystem": {
+      "description": "Raw I/O and metadata operations",
+      "benchmarks": {
+        "raw_write_1kb": {
+          "name": "Raw File Write (1 KB)",
+          "mean_ms": 1.94,
+          "median_ms": 1.67,
+          "throughput": 515,
+          "throughput_unit": "KB/sec"
+        },
+        "raw_write_1mb": {
+          "name": "Raw File Write (1 MB)",
+          "mean_ms": 3.32,
+          "median_ms": 2.81,
+          "throughput": 301,
+          "throughput_unit": "MB/sec"
+        },
+        "raw_write_10mb": {
+          "name": "Raw File Write (10 MB)",
+          "mean_ms": 10.07,
+          "median_ms": 9.10,
+          "throughput": 993,
+          "throughput_unit": "MB/sec"
+        },
+        "raw_read_1kb": {
+          "name": "Raw File Read (1 KB)",
+          "mean_ms": 0.83,
+          "median_ms": 0.63,
+          "throughput": 1.18,
+          "throughput_unit": "MB/sec"
+        },
+        "raw_read_1mb": {
+          "name": "Raw File Read (1 MB)",
+          "mean_ms": 1.47,
+          "median_ms": 1.35,
+          "throughput": 680,
+          "throughput_unit": "MB/sec"
+        },
+        "raw_read_10mb": {
+          "name": "Raw File Read (10 MB)",
+          "mean_ms": 7.90,
+          "median_ms": 7.43,
+          "throughput": 1.24,
+          "throughput_unit": "GB/sec"
+        },
+        "metadata_add": {
+          "name": "Add File to Metadata Index",
+          "mean_ms": 0.23,
+          "median_ms": 0.22
+        },
+        "metadata_lookup": {
+          "name": "Metadata Lookup (random, 1000 files)",
+          "mean_ms": 0.066,
+          "median_ms": 0.061
+        },
+        "directory_list": {
+          "name": "List Directory (1000 files)",
+          "mean_ms": 0.027,
+          "median_ms": 0.026
+        },
+        "metadata_update": {
+          "name": "Update File Metadata",
+          "mean_ms": 0.077,
+          "median_ms": 0.068
+        },
+        "transaction_commit": {
+          "name": "Transaction Begin + Commit",
+          "mean_ms": 0.067,
+          "median_ms": 0.056
+        },
+        "transaction_rollback": {
+          "name": "Transaction Begin + Rollback",
+          "mean_ms": 0.063,
+          "median_ms": 0.057
+        }
+      }
+    }
+  },
+  "summary": {
+    "key_findings": [
+      "Raw I/O throughput: ~1 GB/sec for large files (10 MB+)",
+      "SHA-256 hashing: ~800 MB/sec for bulk data",
+      "KeyState derivation: ~186ms (Argon2id-based, secure)",
+      "Metadata operations: <0.1ms per operation",
+      "Entropic mixing: ~25 KB/sec (intentionally slow for security)",
+      "Full scatter throughput limited by entropic mixing phase"
+    ],
+    "bottlenecks": [
+      "Entropic mixing is CPU-intensive by design",
+      "1 MB scatter takes ~42 seconds due to per-byte HMAC operations",
+      "Consider parallelization for large files"
+    ],
+    "optimization_opportunities": [
+      "Batch small files to amortize metadata overhead",
+      "Use streaming for files > 10 MB",
+      "Potential for SIMD optimization in entropic mixer"
+    ]
+  }
+}

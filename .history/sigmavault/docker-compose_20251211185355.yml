@@ -1,0 +1,294 @@
+# =============================================================================
+# ΣVAULT Docker Compose Configuration
+# =============================================================================
+#
+# Development: docker compose up -d
+# Production:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Testing:     docker compose run --rm test
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # ΣVAULT Core Service
+  # ---------------------------------------------------------------------------
+  sigmavault:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: sigmavault:latest
+    container_name: sigmavault-core
+    restart: unless-stopped
+    
+    # Required for FUSE filesystem mounting
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    security_opt:
+      - apparmor:unconfined
+    
+    environment:
+      - SIGMAVAULT_LOG_LEVEL=INFO
+      - SIGMAVAULT_VAULT_PATH=/vault/default.svault
+      - SIGMAVAULT_MOUNT_POINT=/mnt/sigmavault
+      - SIGMAVAULT_API_PORT=8000
+      - SIGMAVAULT_CONTAINER=docker
+    
+    volumes:
+      # Persistent vault storage
+      - vault_data:/vault
+      # Configuration files
+      - ./config:/app/config:ro
+      # Mount point for FUSE filesystem
+      - type: bind
+        source: /tmp/sigmavault-mounts
+        target: /mnt/sigmavault
+        bind:
+          propagation: shared
+    
+    ports:
+      - "8000:8000"
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sigmavault; print('ok')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+    networks:
+      - sigmavault-network
+
+  # ---------------------------------------------------------------------------
+  # Development Environment
+  # ---------------------------------------------------------------------------
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    image: sigmavault:dev
+    container_name: sigmavault-dev
+    
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    
+    environment:
+      - SIGMAVAULT_LOG_LEVEL=DEBUG
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    
+    volumes:
+      # Mount source code for live editing
+      - .:/app
+      # Separate venv to avoid host conflicts
+      - dev_venv:/app/.venv
+      # Vault data
+      - vault_data:/vault
+    
+    working_dir: /app
+    stdin_open: true
+    tty: true
+    
+    command: bash
+    
+    networks:
+      - sigmavault-network
+    
+    profiles:
+      - dev
+
+  # ---------------------------------------------------------------------------
+  # Test Runner
+  # ---------------------------------------------------------------------------
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    image: sigmavault:test
+    container_name: sigmavault-test
+    
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    
+    environment:
+      - SIGMAVAULT_LOG_LEVEL=DEBUG
+      - PYTEST_ARGS=-v --tb=short
+    
+    volumes:
+      - .:/app:ro
+      - test_cache:/app/.pytest_cache
+    
+    command: >
+      python -m pytest
+        -v
+        --tb=short
+        --cov=sigmavault
+        --cov-report=term-missing
+        --cov-report=xml:/app/coverage.xml
+        tests/
+    
+    networks:
+      - sigmavault-network
+    
+    profiles:
+      - test
+
+  # ---------------------------------------------------------------------------
+  # Benchmark Runner
+  # ---------------------------------------------------------------------------
+  benchmark:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    image: sigmavault:test
+    container_name: sigmavault-bench
+    
+    privileged: true
+    cap_add:
+      - SYS_ADMIN
+    devices:
+      - /dev/fuse
+    
+    environment:
+      - SIGMAVAULT_LOG_LEVEL=WARNING
+    
+    volumes:
+      - .:/app:ro
+      - benchmark_results:/app/benchmarks
+    
+    command: >
+      python -m pytest
+        benchmarks/
+        -v
+        --benchmark-only
+        --benchmark-json=/app/benchmarks/results.json
+    
+    networks:
+      - sigmavault-network
+    
+    profiles:
+      - benchmark
+
+  # ---------------------------------------------------------------------------
+  # Redis Cache (Optional - for distributed deployments)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: sigmavault-redis
+    restart: unless-stopped
+    
+    command: redis-server --appendonly yes
+    
+    volumes:
+      - redis_data:/data
+    
+    ports:
+      - "6379:6379"
+    
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    
+    networks:
+      - sigmavault-network
+    
+    profiles:
+      - full
+
+  # ---------------------------------------------------------------------------
+  # Monitoring - Prometheus (Optional)
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:v2.45.0
+    container_name: sigmavault-prometheus
+    restart: unless-stopped
+    
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    
+    ports:
+      - "9090:9090"
+    
+    networks:
+      - sigmavault-network
+    
+    profiles:
+      - monitoring
+
+  # ---------------------------------------------------------------------------
+  # Monitoring - Grafana (Optional)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:10.0.3
+    container_name: sigmavault-grafana
+    restart: unless-stopped
+    
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=sigmavault
+      - GF_USERS_ALLOW_SIGN_UP=false
+    
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    
+    ports:
+      - "3000:3000"
+    
+    depends_on:
+      - prometheus
+    
+    networks:
+      - sigmavault-network
+    
+    profiles:
+      - monitoring
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  sigmavault-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  vault_data:
+    driver: local
+  dev_venv:
+    driver: local
+  test_cache:
+    driver: local
+  benchmark_results:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
