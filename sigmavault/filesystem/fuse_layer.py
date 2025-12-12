@@ -187,16 +187,39 @@ class VirtualMetadataIndex:
         # Initialize root directory
         self._create_root()
     
+    def _get_uid_gid(self) -> tuple[int, int]:
+        """Get UID/GID in a cross-platform way."""
+        import platform
+        if platform.system() == 'Windows':
+            return 0, 0  # Default values for Windows
+        else:
+            return os.getuid(), os.getgid()
+    
+    def _normalize_parent_path(self, path: str) -> str:
+        """Get normalized parent path (cross-platform, always uses forward slashes)."""
+        parent = str(Path(path).parent)
+        # On Windows, Path('/foo').parent returns '\\' instead of '/'
+        # Normalize to always use forward slashes for consistency
+        if parent == '\\' or parent == '.':
+            return '/'
+        return parent.replace('\\', '/')
+    
     def _create_root(self):
         """Create root directory entry."""
+        import platform
+        
         now = time.time()
+        
+        # Get UID/GID in a cross-platform way
+        uid, gid = self._get_uid_gid()
+        
         root = VirtualFileEntry(
             path='/',
             file_id=secrets.token_bytes(16),
             size=0,
             mode=0o755,
-            uid=os.getuid(),
-            gid=os.getgid(),
+            uid=uid,
+            gid=gid,
             atime=now,
             mtime=now,
             ctime=now,
@@ -221,13 +244,14 @@ class VirtualMetadataIndex:
                 raise FileExistsError(f"File exists: {path}")
             
             now = time.time()
+            uid, gid = self._get_uid_gid()
             entry = VirtualFileEntry(
                 path=path,
                 file_id=secrets.token_bytes(16),
                 size=0,
                 mode=mode,
-                uid=os.getuid(),
-                gid=os.getgid(),
+                uid=uid,
+                gid=gid,
                 atime=now,
                 mtime=now,
                 ctime=now,
@@ -236,8 +260,8 @@ class VirtualMetadataIndex:
             
             self.entries[path] = entry
             
-            # Add to parent's children
-            parent_path = str(Path(path).parent)
+            # Add to parent's children (use normalized path for cross-platform)
+            parent_path = self._normalize_parent_path(path)
             if parent_path not in self.children:
                 self.children[parent_path] = []
             self.children[parent_path].append(path)
@@ -251,13 +275,14 @@ class VirtualMetadataIndex:
                 raise FileExistsError(f"Directory exists: {path}")
             
             now = time.time()
+            uid, gid = self._get_uid_gid()
             entry = VirtualFileEntry(
                 path=path,
                 file_id=secrets.token_bytes(16),
                 size=0,
                 mode=mode,
-                uid=os.getuid(),
-                gid=os.getgid(),
+                uid=uid,
+                gid=gid,
                 atime=now,
                 mtime=now,
                 ctime=now,
@@ -266,8 +291,8 @@ class VirtualMetadataIndex:
             
             self.entries[path] = entry
             
-            # Add to parent's children
-            parent_path = str(Path(path).parent)
+            # Add to parent's children (use normalized path for cross-platform)
+            parent_path = self._normalize_parent_path(path)
             if parent_path not in self.children:
                 self.children[parent_path] = []
             self.children[parent_path].append(path)
@@ -286,8 +311,8 @@ class VirtualMetadataIndex:
             if entry.is_directory and self.children.get(path):
                 raise OSError(errno.ENOTEMPTY, "Directory not empty")
             
-            # Remove from parent's children
-            parent_path = str(Path(path).parent)
+            # Remove from parent's children (use normalized path for cross-platform)
+            parent_path = self._normalize_parent_path(path)
             if parent_path in self.children:
                 self.children[parent_path] = [
                     p for p in self.children[parent_path] if p != path
@@ -652,6 +677,14 @@ class TransactionManager:
             except Exception as e:
                 print(f"Warning: Failed to remove created file from index during rollback: {e}")
                 
+        elif op_type == 'create_directory':
+            # Remove created directory from index
+            path = operation['path']
+            try:
+                self.index.delete(path)
+            except Exception as e:
+                print(f"Warning: Failed to remove created directory from index during rollback: {e}")
+                
         elif op_type == 'cache_put':
             # Remove from cache
             path = operation['path']
@@ -741,12 +774,12 @@ class ScatterStorageBackend:
     Thread-safe for concurrent operations with transaction support.
     """
     
-    def __init__(self, storage_path: Path, scatter_engine: DimensionalScatterEngine):
+    def __init__(self, storage_path: Path, scatter_engine: DimensionalScatterEngine, tx_manager: TransactionManager):
         self.storage_path = storage_path
         self.scatter_engine = scatter_engine
         self.scattered_files: Dict[str, ScatteredFile] = {}
         self._lock = threading.RLock()
-        self.tx_manager = TransactionManager()
+        self.tx_manager = tx_manager
         
         # Create storage directory structure
         self.data_path = storage_path / 'scatter_data'
@@ -797,7 +830,7 @@ class ScatterStorageBackend:
                 # Rollback on failure
                 if tx_id:
                     try:
-                        self.tx_manager.rollback_transaction(tx_id)
+                        self.rollback_transaction(tx_id)
                     except Exception as rollback_error:
                         print(f"Warning: Rollback failed: {rollback_error}")
                 raise e
@@ -857,10 +890,72 @@ class ScatterStorageBackend:
                 # Rollback on failure
                 if tx_id:
                     try:
-                        self.tx_manager.rollback_transaction(tx_id)
+                        self.rollback_transaction(tx_id)
                     except Exception as rollback_error:
                         print(f"Warning: Rollback failed: {rollback_error}")
                 raise e
+    
+    def rollback_transaction(self, tx_id: str):
+        """Rollback a transaction by undoing all operations."""
+        with self._lock:
+            tx = self.tx_manager.get_transaction(tx_id)
+            if not tx:
+                raise ValueError(f"Transaction {tx_id} does not exist")
+            
+            # Execute rollback operations in reverse order
+            for op in reversed(tx.operations):
+                try:
+                    self._execute_rollback(op, tx)
+                except Exception as e:
+                    print(f"Warning: Rollback operation failed: {e}")
+            
+            # Clean up transaction
+            del self.tx_manager.active_transactions[tx_id]
+    
+    def _execute_rollback(self, operation: Dict[str, Any], tx: TransactionState):
+        """Execute a single rollback operation."""
+        op_type = operation['type']
+        
+        if op_type == 'store_file':
+            # Remove stored file and restore previous version
+            ref_id = operation['ref_id']
+            backup_data = tx.get_backup(f'scatter_backup_{ref_id}')
+            
+            # Remove the newly stored file
+            data_file = self.data_path / f'{ref_id}.scatter'
+            meta_file = self.meta_path / f'{ref_id}.meta'
+            
+            try:
+                if data_file.exists():
+                    data_file.unlink()
+                if meta_file.exists():
+                    meta_file.unlink()
+            except Exception as e:
+                print(f"Warning: Failed to remove stored file during rollback: {e}")
+            
+            # Remove from cache
+            if ref_id in self.scattered_files:
+                del self.scattered_files[ref_id]
+            
+            # Restore previous version if it existed
+            if backup_data:
+                try:
+                    self._persist_scattered(ref_id, backup_data)
+                    self.scattered_files[ref_id] = backup_data
+                except Exception as e:
+                    print(f"Warning: Failed to restore backup during rollback: {e}")
+                    
+        elif op_type == 'delete_file':
+            # Restore deleted file
+            ref_id = operation['ref_id']
+            backup_data = tx.get_backup(f'scatter_backup_{ref_id}')
+            
+            if backup_data:
+                try:
+                    self._persist_scattered(ref_id, backup_data)
+                    self.scattered_files[ref_id] = backup_data
+                except Exception as e:
+                    print(f"Warning: Failed to restore deleted file during rollback: {e}")
     
     def _persist_scattered(self, ref_id: str, scattered: ScatteredFile):
         """Persist scattered file to disk. Thread-safe."""
@@ -906,9 +1001,9 @@ class SigmaVaultFS(Operations):
         self.scatter_engine = DimensionalScatterEngine(key_state, medium_size)
         self.index = VirtualMetadataIndex(self.scatter_engine)
         self.cache = FileContentCache()
-        self.lock_manager = VaultLockManager(self.index)
-        self.storage = ScatterStorageBackend(storage_path, self.scatter_engine)
         self.tx_manager = TransactionManager()
+        self.lock_manager = VaultLockManager(self.index)
+        self.storage = ScatterStorageBackend(storage_path, self.scatter_engine, self.tx_manager)
         
         # File handles
         self.open_files: Dict[int, str] = {}
@@ -977,12 +1072,12 @@ class SigmaVaultFS(Operations):
         with self._lock:
             path = self._get_full_path(path)
             
-            yield '.'
-            yield '..'
+            yield b'.'
+            yield b'..'
             
             try:
                 for name in self.index.list_directory(path):
-                    yield name
+                    yield name.encode('utf-8')
             except FileNotFoundError:
                 raise FuseOSError(errno.ENOENT)
             except NotADirectoryError:
@@ -1348,6 +1443,34 @@ class SigmaVaultFS(Operations):
                 'f_flag': 0,
                 'f_namemax': 255,
             }
+    
+    def mkdir(self, path, mode):
+        """Create directory. Thread-safe with transaction support."""
+        with self._lock:
+            path = self._get_full_path(path)
+            
+            # Begin transaction
+            tx_id = f"mkdir_{path}_{time.time()}"
+            tx = self.tx_manager.begin_transaction(tx_id)
+            
+            try:
+                # Create directory entry
+                entry = self.index.create_directory(path, mode)
+                tx.add_operation('create_directory', path=path, mode=mode)
+                
+                # Save index
+                self._save_index()
+                tx.add_operation('save_index')
+                
+                # Commit transaction
+                self.tx_manager.commit_transaction(tx_id)
+                
+            except FileExistsError:
+                self.tx_manager.rollback_transaction(tx_id)
+                raise FuseOSError(errno.EEXIST)
+            except Exception as e:
+                self.tx_manager.rollback_transaction(tx_id)
+                raise e
     
     # ------ Vault Lock Operations ------
     

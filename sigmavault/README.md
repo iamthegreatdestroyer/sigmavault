@@ -343,6 +343,80 @@ For maximum performance, ΣVAULT caches frequently accessed files in memory afte
 
 ---
 
+## Performance Characteristics
+
+Baseline benchmarks measured on Python 3.13.7, Windows (see `.benchmarks/results/baseline.json`).
+
+### Cryptographic Operations
+
+| Operation                  | Mean Time  | Throughput      |
+| -------------------------- | ---------- | --------------- |
+| SHA-256 (1 KB)             | 0.062 ms   | ~16 MB/sec      |
+| SHA-256 (1 MB)             | 1.24 ms    | **~800 MB/sec** |
+| SHA-512 (1 MB)             | 2.8 ms     | ~350 MB/sec     |
+| PBKDF2-SHA256 (10k iters)  | 10.7 ms    | —               |
+| PBKDF2-SHA256 (100k iters) | 111 ms     | —               |
+| **KeyState Derivation**    | **186 ms** | —               |
+
+> **Note:** KeyState derivation includes Argon2id + multi-round PBKDF2. The ~186ms derivation time is intentional—fast enough for UX, slow enough to resist brute-force attacks.
+
+### Dimensional Scattering Operations
+
+| Operation                  | Mean Time   | Throughput  |
+| -------------------------- | ----------- | ----------- |
+| Coordinate Creation        | 0.13 ms     | —           |
+| Coordinate Serialization   | 0.032 ms    | —           |
+| Address Projection (1GB)   | 0.051 ms    | —           |
+| Topology Generation (1 KB) | 0.68 ms     | ~1.4 MB/sec |
+| Topology Generation (1 MB) | 0.66 ms     | ~1.5 GB/sec |
+| **Entropic Mix (1 KB)**    | **35 ms**   | ~28 KB/sec  |
+| **Entropic Mix (1 MB)**    | **~41 sec** | ~25 KB/sec  |
+| Entropic Unmix (1 KB)      | 0.76 ms     | ~1.3 MB/sec |
+| Entropic Unmix (1 MB)      | 163 ms      | ~6.1 MB/sec |
+| Full Scatter (1 KB)        | 23 ms       | ~43 KB/sec  |
+| Full Scatter (1 MB)        | ~42 sec     | ~24 KB/sec  |
+
+> **Why is Entropic Mixing slow?** By design. The entropic mixer applies per-byte HMAC operations to create cryptographic indistinguishability between signal and noise. This is a security feature, not a bug. For bulk data, consider chunking with parallel processing.
+
+### Raw I/O Operations
+
+| Operation         | Mean Time | Throughput      |
+| ----------------- | --------- | --------------- |
+| Raw Write (1 KB)  | 1.9 ms    | ~515 KB/sec     |
+| Raw Write (1 MB)  | 3.3 ms    | ~300 MB/sec     |
+| Raw Write (10 MB) | 10.1 ms   | **~1 GB/sec**   |
+| Raw Read (1 KB)   | 0.83 ms   | ~1.2 MB/sec     |
+| Raw Read (1 MB)   | 1.5 ms    | ~680 MB/sec     |
+| Raw Read (10 MB)  | 7.9 ms    | **~1.2 GB/sec** |
+
+### Metadata Operations
+
+| Operation                         | Mean Time |
+| --------------------------------- | --------- |
+| Add File to Index                 | 0.23 ms   |
+| Metadata Lookup (1000-file index) | 0.066 ms  |
+| List Directory (1000 files)       | 0.027 ms  |
+| Update File Metadata              | 0.077 ms  |
+| Transaction Commit                | 0.067 ms  |
+| Transaction Rollback              | 0.063 ms  |
+
+### Key Performance Findings
+
+1. **Raw I/O is fast** — ~1 GB/sec for large files (10 MB+)
+2. **Hashing is efficient** — SHA-256 at ~800 MB/sec
+3. **Metadata operations are sub-millisecond** — excellent for file browsing
+4. **Entropic mixing is intentionally slow** — ~25 KB/sec provides security
+5. **Unmixing is 150x faster than mixing** — asymmetric by design
+
+### Optimization Recommendations
+
+- **Small files (<1 KB):** Batch to amortize metadata overhead
+- **Large files (>1 MB):** Use streaming and parallel chunk processing
+- **Bulk operations:** Consider disabling temporal variance temporarily
+- **Performance-critical:** Cache decrypted content in memory
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
