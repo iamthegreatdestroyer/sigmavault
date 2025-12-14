@@ -57,10 +57,13 @@ dev = [
 [project.scripts]
 sigmavault = "sigmavault.cli:main"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["sigmavault*"]
+[tool.setuptools]
+packages = ["sigmavault"]
+
+[tool.setuptools.package-data]
+sigmavault = ["py.typed"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+pythonpath = ["."]
