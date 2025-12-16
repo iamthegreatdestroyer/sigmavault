@@ -20,8 +20,8 @@ from sigmavault.drivers.storage.base import (
     StorageWriteError,
     StorageCapacityError,
 )
-from sigmavault.drivers.storage.file_backend import FileStorageBackend
-from sigmavault.drivers.storage.memory_backend import MemoryStorageBackend
+from drivers.storage.file_backend import FileStorageBackend
+from drivers.storage.memory_backend import MemoryStorageBackend
 
 
 class TestStorageCapabilities:
