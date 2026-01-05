@@ -1,5 +1,6 @@
 # =============================================================================
 # ΣVAULT Docker Compose Configuration
+# Port Series: 36000-36999 (SigmaVault exclusive range)
 # =============================================================================
 #
 # Development: docker compose up -d
@@ -49,7 +50,7 @@ services:
           propagation: shared
 
     ports:
-      - "8000:8000"
+      - "36080:8000"  # Vault API (internal 8000 → external 36080)
 
     healthcheck:
       test: ["CMD", "python", "-c", "import sigmavault; print('ok')"]
@@ -194,7 +195,7 @@ services:
       - redis_data:/data
 
     ports:
-      - "6379:6379"
+      - "36500:6379"  # Redis (internal 6379 → external 36500)
 
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -226,7 +227,7 @@ services:
       - "--web.enable-lifecycle"
 
     ports:
-      - "9090:9090"
+      - "36900:9090"  # Prometheus (internal 9090 → external 36900)
 
     networks:
       - sigmavault-network
@@ -246,13 +247,14 @@ services:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=sigmavault
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:36910
 
     volumes:
       - grafana_data:/var/lib/grafana
       - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
 
     ports:
-      - "3000:3000"
+      - "36910:3000"  # Grafana (internal 3000 → external 36910)
 
     depends_on:
       - prometheus
