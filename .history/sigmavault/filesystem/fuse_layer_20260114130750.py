@@ -1303,21 +1303,13 @@ class SigmaVaultFS(Operations):
                 raise e
     
     def open(self, path, flags):
-        """Open file. Thread-safe with ML access logging and security checks."""
+        """Open file. Thread-safe with ML access logging."""
         start_time = time.time()
         success = True
         error_code = None
         
         with self._lock:
             path = self._get_full_path(path)
-            
-            # ML Security check before operation
-            if not self._check_ml_security(path, "open"):
-                success = False
-                error_code = "EACCES_ML"
-                self._log_access(path, "open", 0, start_time, success, error_code)
-                raise FuseOSError(errno.EACCES)
-            
             entry = self.index.get(path)
             
             if not entry:
@@ -1370,11 +1362,6 @@ class SigmaVaultFS(Operations):
         with self._lock:
             path = self._get_full_path(path)
             
-            # ML Security check before read
-            if not self._check_ml_security(path, "read"):
-                self._log_access(path, "read", 0, start_time, False, "EACCES_ML")
-                raise FuseOSError(errno.EACCES)
-            
             content = self.cache.get(path)
             if content is None:
                 success = False
@@ -1394,7 +1381,7 @@ class SigmaVaultFS(Operations):
             return result
     
     def write(self, path, data, offset, fh):
-        """Write to file. Thread-safe with ML access logging and security checks."""
+        """Write to file. Thread-safe with ML access logging."""
         start_time = time.time()
         success = True
         error_code = None
@@ -1402,11 +1389,6 @@ class SigmaVaultFS(Operations):
         
         with self._lock:
             path = self._get_full_path(path)
-            
-            # ML Security check before write (writes are more critical)
-            if not self._check_ml_security(path, "write"):
-                self._log_access(path, "write", 0, start_time, False, "EACCES_ML")
-                raise FuseOSError(errno.EACCES)
             
             content = self.cache.get(path)
             if content is None:

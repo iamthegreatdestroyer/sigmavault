@@ -6,15 +6,14 @@ Phase 5: Adaptive Intelligence Layer
 
 This module provides machine learning capabilities for ΣVAULT:
 - Anomaly detection in access patterns
-- Real-time threat detection and response (ML Security Bridge)
 - Adaptive scattering parameter optimization
 - Predictive re-scattering timing
 - Pattern obfuscation via VAE models
 - Decoy pattern generation
 - Synthetic data generation for testing
 
-Agents: @TENSOR @NEURAL @FORTRESS @SENTRY
-Status: PHASE 5 - DAY 2 ACTIVE
+Agents: @TENSOR @NEURAL @NEXUS
+Status: PHASE 5 ACTIVE
 """
 
 from .access_logger import AccessLogger, AccessEvent
@@ -39,15 +38,6 @@ from .pattern_vae import (
     GeneratedPattern,
     create_pattern_vae,
     generate_decoy_events
-)
-from .security_bridge import (
-    MLSecurityBridge,
-    MLSecurityConfig,
-    ThreatAction,
-    ThreatResponse,
-    AlertChannel,
-    SecurityAlert,
-    create_security_bridge
 )
 
 __all__ = [
@@ -76,16 +66,8 @@ __all__ = [
     "GeneratedPattern",
     "create_pattern_vae",
     "generate_decoy_events",
-    # ML Security Bridge (Day 2)
-    "MLSecurityBridge",
-    "MLSecurityConfig",
-    "ThreatAction",
-    "ThreatResponse",
-    "AlertChannel",
-    "SecurityAlert",
-    "create_security_bridge",
 ]
 
-__version__ = "0.5.1"
+__version__ = "0.5.0"
 __phase__ = 5
-__status__ = "DAY 2 ACTIVE"
+__status__ = "ACTIVE"

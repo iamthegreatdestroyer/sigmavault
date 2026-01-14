@@ -120,18 +120,6 @@ from ..crypto.hybrid_key import (
 )
 from ..ml.access_logger import AccessLogger, AccessEvent
 
-# ML Security Bridge (optional - for real-time anomaly detection)
-try:
-    from ..ml.security_bridge import (
-        MLSecurityBridge, MLSecurityConfig, ThreatAction,
-        create_security_bridge
-    )
-    HAS_ML_SECURITY = True
-except ImportError:
-    HAS_ML_SECURITY = False
-    MLSecurityBridge = None
-    ThreatAction = None
-
 
 # ============================================================================
 # VIRTUAL METADATA INDEX
@@ -1031,16 +1019,11 @@ class SigmaVaultFS(Operations):
     Implements standard filesystem operations while transparently
     handling dimensional scattering underneath.
     
-    Features:
-    - Transaction support with automatic rollback on failure
-    - ML-based anomaly detection and threat response
-    - Real-time security monitoring and alerting
+    Features transaction support with automatic rollback on failure.
     """
     
     def __init__(self, storage_path: Path, key_state: KeyState, 
-                 medium_size: int = 10 * 1024 * 1024 * 1024,  # 10GB default
-                 enable_ml_security: bool = True,
-                 ml_webhook_url: Optional[str] = None):
+                 medium_size: int = 10 * 1024 * 1024 * 1024):  # 10GB default
         self.storage_path = storage_path
         self.key_state = key_state
         
@@ -1058,22 +1041,6 @@ class SigmaVaultFS(Operations):
             db_path=storage_path / 'ml_access_log.db',
             vault_id=self.vault_id
         )
-        
-        # Initialize ML Security Bridge for real-time threat detection
-        self.ml_security: Optional[MLSecurityBridge] = None
-        self.enable_ml_security = enable_ml_security and HAS_ML_SECURITY
-        
-        if self.enable_ml_security:
-            try:
-                self.ml_security = create_security_bridge(
-                    vault_path=storage_path,
-                    webhook_url=ml_webhook_url,
-                    auto_start=True
-                )
-                print("🛡️  ML Security Bridge initialized")
-            except Exception as e:
-                print(f"⚠️  ML Security Bridge failed to initialize: {e}")
-                self.ml_security = None
         
         # File handles
         self.open_files: Dict[int, str] = {}
@@ -1138,13 +1105,10 @@ class SigmaVaultFS(Operations):
         
         All sensitive identifiers are hashed for privacy.
         This data is used to train anomaly detection models.
-        
-        Also sends events to ML Security Bridge for real-time analysis.
         """
         try:
             duration_ms = (time.time() - start_time) * 1000
             
-            # Log to access logger (persistent storage)
             self.access_logger.log_event(
                 file_path=path,
                 operation=operation,
@@ -1153,61 +1117,9 @@ class SigmaVaultFS(Operations):
                 success=success,
                 error_code=error_code
             )
-            
-            # Also log to ML Security Bridge for real-time analysis
-            if self.ml_security:
-                self.ml_security.log_access(
-                    path=path,
-                    operation=operation,
-                    bytes_accessed=bytes_accessed,
-                    duration_ms=round(duration_ms, 2),
-                    success=success,
-                    error_code=error_code
-                )
-                
         except Exception as e:
             # Logging should never break normal operations
             print(f"Warning: Access logging failed: {e}")
-    
-    def _check_ml_security(self, path: str, operation: str) -> bool:
-        """
-        Check if operation should be allowed based on ML security analysis.
-        
-        Returns True if operation is allowed, False if blocked.
-        May also apply throttling if threat detected.
-        """
-        if not self.ml_security:
-            return True  # Allow if ML security not enabled
-        
-        try:
-            action = self.ml_security.check_access(
-                path=path,
-                operation=operation
-            )
-            
-            if action == ThreatAction.BLOCK:
-                return False
-            elif action == ThreatAction.THROTTLE:
-                self.ml_security.apply_throttle()
-            
-            return True
-            
-        except Exception as e:
-            # Security checks should fail open (allow) on errors
-            print(f"Warning: ML security check failed: {e}")
-            return True
-    
-    def get_security_status(self) -> Dict[str, Any]:
-        """Get current ML security status."""
-        if self.ml_security:
-            return self.ml_security.get_security_status()
-        return {'enabled': False, 'message': 'ML security not enabled'}
-    
-    def train_security_model(self, training_days: int = 30) -> Dict[str, Any]:
-        """Train the ML security model on historical access data."""
-        if not self.ml_security:
-            return {'error': 'ML security not enabled'}
-        return self.ml_security.train_detector(training_days)
     
     # ------ FUSE Operations ------
     
@@ -1303,21 +1215,13 @@ class SigmaVaultFS(Operations):
                 raise e
     
     def open(self, path, flags):
-        """Open file. Thread-safe with ML access logging and security checks."""
+        """Open file. Thread-safe with ML access logging."""
         start_time = time.time()
         success = True
         error_code = None
         
         with self._lock:
             path = self._get_full_path(path)
-            
-            # ML Security check before operation
-            if not self._check_ml_security(path, "open"):
-                success = False
-                error_code = "EACCES_ML"
-                self._log_access(path, "open", 0, start_time, success, error_code)
-                raise FuseOSError(errno.EACCES)
-            
             entry = self.index.get(path)
             
             if not entry:
@@ -1370,11 +1274,6 @@ class SigmaVaultFS(Operations):
         with self._lock:
             path = self._get_full_path(path)
             
-            # ML Security check before read
-            if not self._check_ml_security(path, "read"):
-                self._log_access(path, "read", 0, start_time, False, "EACCES_ML")
-                raise FuseOSError(errno.EACCES)
-            
             content = self.cache.get(path)
             if content is None:
                 success = False
@@ -1394,7 +1293,7 @@ class SigmaVaultFS(Operations):
             return result
     
     def write(self, path, data, offset, fh):
-        """Write to file. Thread-safe with ML access logging and security checks."""
+        """Write to file. Thread-safe with ML access logging."""
         start_time = time.time()
         success = True
         error_code = None
@@ -1402,11 +1301,6 @@ class SigmaVaultFS(Operations):
         
         with self._lock:
             path = self._get_full_path(path)
-            
-            # ML Security check before write (writes are more critical)
-            if not self._check_ml_security(path, "write"):
-                self._log_access(path, "write", 0, start_time, False, "EACCES_ML")
-                raise FuseOSError(errno.EACCES)
             
             content = self.cache.get(path)
             if content is None:
