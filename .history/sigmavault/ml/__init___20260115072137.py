@@ -163,21 +163,8 @@ __all__ = [
     "create_scatter_manager",
     "get_file_sensitivity",
     "get_file_type",
-    # Monitoring Dashboard (Day 4)
-    "MetricsCollector",
-    "MetricType",
-    "Metric",
-    "AlertManager",
-    "Alert",
-    "AlertSeverity",
-    "AlertChannelProtocol",  # Renamed from AlertChannel to avoid collision
-    "EmailAlertChannel",
-    "WebhookAlertChannel",
-    "LogAlertChannel",
-    "MonitoringDashboard",
-    "DashboardConfig",
 ]
 
-__version__ = "0.5.4"
+__version__ = "0.5.3"
 __phase__ = 5
-__status__ = "DAY 4 ACTIVE"
+__status__ = "DAY 3 ACTIVE"

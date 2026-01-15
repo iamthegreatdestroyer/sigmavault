@@ -104,23 +104,18 @@ You have access to the ELITE AGENT COLLECTIVE - a system of 40 specialized AI ag
 # [Skill Name]
 
 ## Purpose
-
 [What this skill teaches Copilot]
 
 ## Context
-
 [When this skill should be loaded]
 
 ## Instructions
-
 [Specific behaviors, patterns, or knowledge]
 
 ## Examples
-
 [Code examples or demonstrations]
 
 ## Constraints
-
 [Boundaries and limitations]
 ```
 
@@ -1125,32 +1120,26 @@ Place skills in `.github/skills/` directory. Copilot loads them on-demand based 
 
 ```markdown
 <!-- .github/skills/project-context/SKILL.md -->
-
 # Project Context
 
 ## Purpose
-
 Provide domain-specific knowledge for this project.
 
 ## Project Details
-
 - **Name**: [Project Name]
 - **Type**: [Monorepo/Library/Application]
 - **Primary Languages**: [TypeScript, Python, etc.]
 - **Architecture**: [Microservices/Monolith/Hybrid]
 
 ## Key Patterns
-
 - Use [pattern] for [situation]
 - Prefer [approach] over [alternative]
 
 ## Domain Terminology
-
 - **Term1**: Definition
 - **Term2**: Definition
 
 ## Dependencies
-
 - Core: [list]
 - Dev: [list]
 ```
@@ -1159,29 +1148,24 @@ Provide domain-specific knowledge for this project.
 
 ```markdown
 <!-- .github/skills/security-protocols/SKILL.md -->
-
 # Security Protocols
 
 ## Purpose
-
 Enforce security standards across all code contributions.
 
 ## Required Practices
-
 1. All user input MUST be validated and sanitized
 2. Use parameterized queries for database operations
 3. Implement rate limiting on public endpoints
 4. Apply principle of least privilege
 
 ## Forbidden Patterns
-
 - eval() or equivalent dynamic code execution
 - Hardcoded credentials or API keys
 - SQL string concatenation
 - Disabled CORS in production
 
 ## Security Review Checklist
-
 - [ ] Input validation
 - [ ] Authentication/Authorization checks
 - [ ] Sensitive data handling
@@ -1324,17 +1308,14 @@ Agents auto-activate based on context:
 # Project Context
 
 ## Project
-
 - Name: ${PROJECT_NAME}
 - Type: ${monorepo|library|application|service}
 - Languages: ${languages}
 
 ## Architecture Decisions
-
 - ${ADR summaries}
 
 ## Conventions
-
 - ${coding standards}
 - ${naming conventions}
 ```
@@ -1345,19 +1326,16 @@ Agents auto-activate based on context:
 # Testing Standards
 
 ## Coverage Targets
-
 - Unit: 80%
 - Integration: 60%
 - E2E: Critical paths
 
 ## Frameworks
-
 - Unit: ${jest|pytest|etc}
 - Integration: ${framework}
 - E2E: ${cypress|playwright|etc}
 
 ## Patterns
-
 - Use ${pattern} for ${situation}
 ```
 
@@ -1367,13 +1345,11 @@ Agents auto-activate based on context:
 # Code Patterns
 
 ## Preferred Patterns
-
 - Error handling: ${approach}
 - Async operations: ${approach}
 - State management: ${approach}
 
 ## Anti-Patterns to Avoid
-
 - ${list forbidden patterns}
 ```
 
@@ -1383,18 +1359,15 @@ Agents auto-activate based on context:
 # Domain Knowledge
 
 ## Terminology
-
-| Term    | Definition    |
-| ------- | ------------- |
+| Term | Definition |
+|------|------------|
 | ${term} | ${definition} |
 
 ## Business Rules
-
 - ${rule 1}
 - ${rule 2}
 
 ## External Systems
-
 - ${system}: ${purpose}
 ```
 
