@@ -100,6 +100,8 @@ class AnomalyDetector:
         self.model: Optional[IsolationForest] = None
         self.scaler: Optional[StandardScaler] = None
         self.feature_extractor = FeatureExtractor()
+        self._access_logger: Optional[AccessLogger] = None
+        self._closed = False
         
         # Load existing model if available
         if self.model_path.exists():
@@ -402,3 +404,29 @@ class AnomalyDetector:
             'model_path': str(self.model_path),
             'feature_count': len(self.feature_extractor.get_feature_names())
         }
+    
+    def close(self):
+        """Close resources and cleanup."""
+        if self._closed:
+            return
+        
+        # Close any internal access logger
+        if self._access_logger is not None:
+            self._access_logger.close()
+            self._access_logger = None
+        
+        self._closed = True
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with cleanup."""
+        self.close()
+        return False
+    
+    def __del__(self):
+        """Ensure cleanup on garbage collection."""
+        self.close()
+

@@ -103,6 +103,7 @@ class AccessLogger:
         
         self.buffer_size = buffer_size
         self.retention_days = retention_days
+        self._closed = False
         
         # In-memory ring buffer for fast access
         self.buffer: deque = deque(maxlen=buffer_size)
@@ -329,3 +330,34 @@ class AccessLogger:
         """
         data = f"{identifier}:{salt}".encode('utf-8')
         return hashlib.sha256(data).hexdigest()
+    
+    def close(self):
+        """Close database connections and cleanup resources."""
+        if self._closed:
+            return
+        
+        # Force close any open SQLite connections
+        # SQLite connections are created/closed in context managers,
+        # but we ensure file is released
+        try:
+            # Perform a vacuum to compact and close properly
+            with sqlite3.connect(str(self.db_path)) as conn:
+                conn.execute("PRAGMA optimize")
+                conn.commit()
+        except Exception:
+            pass  # Ignore errors during cleanup
+        
+        self._closed = True
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with cleanup."""
+        self.close()
+        return False
+    
+    def __del__(self):
+        """Ensure cleanup on garbage collection."""
+        self.close()

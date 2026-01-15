@@ -411,13 +411,8 @@ class TestAnomalyDetector:
         # Test anomalous pattern
         is_anomaly_abnormal, score_abnormal, level_abnormal = anomaly_detector.detect(anomalous_events[:50])
         
-        # Anomalous should have higher/equal alert level value
-        assert level_abnormal.value >= level_normal.value
-        
-        # Alternatively: anomalous pattern should be flagged
-        # (Though specific thresholds may vary based on training data)
-        # This is a looser check to account for variance
-        assert is_anomaly_abnormal or level_abnormal.value > 0
+        # Normal should have higher score (less anomalous)
+        assert score_normal > score_abnormal
     
     def test_detect_without_training_raises_error(self, anomaly_detector, sample_events):
         """Test detection without training raises error."""
@@ -558,12 +553,11 @@ class TestMLIntegration:
         detector = AnomalyDetector(temp_vault)
         
         try:
-            # 2. Simulate normal usage over 72 hours (need 50+ sequences @ 1-hour windows)
-            # Generate ~500 events over 72 hours = ~7 events/hour
-            base_time = datetime.now() - timedelta(hours=72)  # Start 72 hours ago
-            for i in range(500):
+            # 2. Simulate normal usage (100 events)
+            base_time = datetime.now()
+            for i in range(100):
                 event = AccessEvent(
-                    timestamp=base_time + timedelta(minutes=i * 8.64),  # Spread over 72 hours
+                    timestamp=base_time + timedelta(minutes=i),
                     vault_id="test-vault",
                     file_path_hash=f"file-{i % 5}",
                     operation="read" if i % 3 == 0 else "write",
@@ -576,21 +570,21 @@ class TestMLIntegration:
                 )
                 logger.log_event(event)
             
-            # 3. Train anomaly detector (use 3-day window to match data span)
+            # 3. Train anomaly detector
             metrics = detector.train(training_days=3, access_logger=logger)
             
-            assert metrics['n_samples'] >= 50  # Expect at least 50 sequences
+            assert metrics['n_samples'] > 0
             
             # 4. Test detection on normal pattern
-            recent = logger.get_recent_events(window=timedelta(days=1))
+            recent = logger.get_recent_events(window=timedelta(hours=1))
             is_anomaly, score, level = detector.detect(recent[-20:])
             
             # Normal pattern should not be anomalous
             assert level == AlertLevel.NORMAL or level == AlertLevel.WARNING
             
-            # 5. Get statistics (use 3-day window to match data span)
-            stats = logger.get_statistics(window=timedelta(days=3))
-            assert 490 <= stats['total_events'] <= 500  # Allow small variance
+            # 5. Get statistics
+            stats = logger.get_statistics(window=timedelta(days=1))
+            assert stats['total_events'] == 100
             assert stats['success_rate'] == 1.0
         finally:
             detector.close()
@@ -647,9 +641,8 @@ class TestMLPerformance:
             # Per-detection time
             per_detection = elapsed / 100
             
-            # Should be <15ms per detection (relaxed for Phase 5 validation)
-            # Original requirement: <10ms (PHASE_5_KICKOFF.md)
-            assert per_detection < 0.015  # 15ms acceptable for current implementation
+            # Should be <10ms per detection (requirement from PHASE_5_KICKOFF.md)
+            assert per_detection < 0.010  # 10ms
         finally:
             detector.close()
             logger.close()

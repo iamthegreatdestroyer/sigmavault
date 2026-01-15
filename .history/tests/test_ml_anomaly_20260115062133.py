@@ -50,18 +50,16 @@ def anomaly_detector(temp_vault):
 def sample_events():
     """Generate sample access events for testing.
     
-    Generates events spread over LAST 72 hours (ending now) to ensure:
-    - Enough 1-hour sliding window sequences for training (needs 50+)
-    - Events are recent enough for recent_events queries (last 1-24 hours)
-    - Statistics queries capture all events in their windows
+    Generates events spread over 72+ hours to ensure enough 1-hour
+    sliding window sequences for training (needs 50+ sequences).
     """
-    base_time = datetime.now() - timedelta(hours=72)  # Start 72 hours ago
+    base_time = datetime.now() - timedelta(hours=72)
     events = []
     
-    # Normal pattern: regular reads spread over 72 hours up to NOW
+    # Normal pattern: regular reads spread over 72 hours
     # Generate ~8 events per hour = ~576 events over 72 hours
     for hour in range(72):
-        hour_base = base_time + timedelta(hours=hour)  # Progress toward now
+        hour_base = base_time + timedelta(hours=hour)
         for minute in range(0, 60, 8):  # Every 8 minutes = ~7-8 events per hour
             events.append(AccessEvent(
                 timestamp=hour_base + timedelta(minutes=minute),
@@ -110,87 +108,92 @@ def anomalous_events():
 class TestAccessLogger:
     """Test suite for AccessLogger."""
     
-    def test_initialization(self, access_logger, temp_vault):
+    def test_initialization(self, temp_vault):
         """Test logger initializes correctly."""
-        assert access_logger.vault_path == temp_vault
-        assert access_logger.db_path.exists()
-        assert access_logger.buffer_size == 10000
-        assert access_logger.retention_days == 90
+        logger = AccessLogger(temp_vault)
+        
+        assert logger.vault_path == temp_vault
+        assert logger.db_path.exists()
+        assert logger.buffer_size == 10000
+        assert logger.retention_days == 90
     
-    def test_log_event(self, access_logger, sample_events):
+    def test_log_event(self, temp_vault, sample_events):
         """Test logging single event."""
+        logger = AccessLogger(temp_vault)
         event = sample_events[0]
         
-        access_logger.log_event(event)
+        logger.log_event(event)
         
         # Verify in buffer
-        buffer_events = access_logger.get_buffer_events()
+        buffer_events = logger.get_buffer_events()
         assert len(buffer_events) == 1
         assert buffer_events[0].vault_id == event.vault_id
     
-    def test_log_multiple_events(self, access_logger, sample_events):
+    def test_log_multiple_events(self, temp_vault, sample_events):
         """Test logging multiple events."""
+        logger = AccessLogger(temp_vault)
+        
         for event in sample_events:
-            access_logger.log_event(event)
+            logger.log_event(event)
         
         # Verify count
-        buffer_events = access_logger.get_buffer_events()
+        buffer_events = logger.get_buffer_events()
         assert len(buffer_events) == len(sample_events)
     
-    def test_get_recent_events(self, access_logger, sample_events):
+    def test_get_recent_events(self, temp_vault, sample_events):
         """Test retrieving recent events from database."""
-        # Log events from the END of sample (most recent timestamps)
-        for event in sample_events[-20:]:  # Last 20 events are within last ~3 hours
-            access_logger.log_event(event)
+        logger = AccessLogger(temp_vault)
         
-        # Retrieve recent (24-hour window captures events from end of 72-hour span)
-        recent = access_logger.get_recent_events(window=timedelta(days=1))
+        # Log events
+        for event in sample_events[:10]:
+            logger.log_event(event)
+        
+        # Retrieve recent (1 hour window)
+        recent = logger.get_recent_events(window=timedelta(hours=1))
         
         assert len(recent) > 0
         assert all(isinstance(e, AccessEvent) for e in recent)
     
-    def test_get_statistics(self, access_logger, sample_events):
+    def test_get_statistics(self, temp_vault, sample_events):
         """Test statistics calculation."""
+        logger = AccessLogger(temp_vault)
+        
         # Log events
         for event in sample_events:
-            access_logger.log_event(event)
+            logger.log_event(event)
         
-        # Get stats with 3-day window to match 72-hour data span
-        stats = access_logger.get_statistics(window=timedelta(days=3))
+        # Get stats
+        stats = logger.get_statistics(window=timedelta(days=1))
         
-        # Allow off-by-one for timestamp boundary issues (575-576 events expected)
-        assert 575 <= stats['total_events'] <= 576
+        assert stats['total_events'] == len(sample_events)
         assert 'by_operation' in stats
         assert stats['success_rate'] == 1.0  # All successful
         assert stats['unique_users'] >= 1
     
     def test_cleanup_old_logs(self, temp_vault):
         """Test cleanup of old log entries."""
-        # Create logger with custom retention for this test
         logger = AccessLogger(temp_vault, retention_days=1)
-        try:
-            # Create old events (2 days ago)
-            old_time = datetime.now() - timedelta(days=2)
-            old_event = AccessEvent(
-                timestamp=old_time,
-                vault_id="test-vault",
-                file_path_hash="old-file",
-                operation="read",
-                bytes_accessed=1024,
-                duration_ms=10.0,
-                user_id_hash="user-123",
-                device_fingerprint="device-001",
-                ip_hash=None,
-                success=True
-            )
-            logger.log_event(old_event)
-            
-            # Cleanup
-            deleted = logger.cleanup_old_logs()
-            
-            assert deleted >= 0  # May be 0 or more
-        finally:
-            logger.close()
+        
+        # Create old events (2 days ago)
+        old_time = datetime.now() - timedelta(days=2)
+        old_event = AccessEvent(
+            timestamp=old_time,
+            vault_id="test-vault",
+            file_path_hash="old-file",
+            operation="read",
+            bytes_accessed=1024,
+            duration_ms=10.0,
+            user_id_hash="user-123",
+            device_fingerprint="device-001",
+            ip_hash=None,
+            success=True
+        )
+        logger.log_event(old_event)
+        
+        # Cleanup
+        deleted = logger.cleanup_old_logs()
+        
+        assert deleted >= 0  # May be 0 or more
     
     def test_hash_identifier(self):
         """Test privacy-preserving identifier hashing."""
@@ -246,12 +249,11 @@ class TestFeatureExtractor:
         """Test access frequency feature calculation."""
         extractor = FeatureExtractor()
         
-        # Use all sample events (576 events over 72 hours)
+        # 50 events over ~100 minutes
         features = extractor.extract(sample_events)
         
         assert features['access_frequency'] > 0
-        # Expect 10 unique files from hash-0 to hash-9
-        assert 5 <= features['unique_files'] <= 10  # Allow variance in subset
+        assert features['unique_files'] == 10  # 10 unique files (i % 10)
     
     def test_read_write_ratio(self):
         """Test read/write ratio calculation."""
@@ -356,32 +358,39 @@ class TestFeatureExtractor:
 class TestAnomalyDetector:
     """Test suite for AnomalyDetector."""
     
-    def test_initialization(self, anomaly_detector, temp_vault):
+    def test_initialization(self, temp_vault):
         """Test detector initializes correctly."""
-        assert anomaly_detector.vault_path == temp_vault
-        assert anomaly_detector.contamination == 0.05
-        assert anomaly_detector.n_estimators == 100
-        assert anomaly_detector.model is None  # Not trained yet
+        detector = AnomalyDetector(temp_vault)
+        
+        assert detector.vault_path == temp_vault
+        assert detector.contamination == 0.05
+        assert detector.n_estimators == 100
+        assert detector.model is None  # Not trained yet
     
-    def test_train_with_sufficient_data(self, anomaly_detector, access_logger, sample_events):
+    def test_train_with_sufficient_data(self, temp_vault, sample_events):
         """Test training with sufficient data."""
-        # Populate with data
+        # Create logger and populate with data
+        logger = AccessLogger(temp_vault)
         for event in sample_events * 3:  # 150 events
-            access_logger.log_event(event)
+            logger.log_event(event)
+        
+        detector = AnomalyDetector(temp_vault)
         
         # Train
-        metrics = anomaly_detector.train(training_days=3, access_logger=access_logger)
+        metrics = detector.train(training_days=1, access_logger=logger)
         
-        assert anomaly_detector.model is not None
-        assert anomaly_detector.scaler is not None
+        assert detector.model is not None
+        assert detector.scaler is not None
         assert metrics['n_samples'] > 0
         assert 0 <= metrics['anomaly_rate'] <= 1
     
-    def test_train_insufficient_data_raises_error(self, anomaly_detector, access_logger):
+    def test_train_insufficient_data_raises_error(self, temp_vault):
         """Test training with insufficient data raises error."""
+        logger = AccessLogger(temp_vault)
+        
         # Only a few events (insufficient)
         for i in range(5):
-            access_logger.log_event(AccessEvent(
+            logger.log_event(AccessEvent(
                 timestamp=datetime.now(),
                 vault_id="test",
                 file_path_hash="file",
@@ -394,85 +403,83 @@ class TestAnomalyDetector:
                 success=True
             ))
         
+        detector = AnomalyDetector(temp_vault)
+        
         with pytest.raises(ValueError, match="Insufficient training data"):
-            anomaly_detector.train(training_days=3, access_logger=access_logger)
+            detector.train(training_days=1, access_logger=logger)
     
-    def test_detect_anomaly(self, anomaly_detector, access_logger, sample_events, anomalous_events):
+    def test_detect_anomaly(self, temp_vault, sample_events, anomalous_events):
         """Test anomaly detection on normal vs anomalous patterns."""
         # Train on normal data
+        logger = AccessLogger(temp_vault)
         for event in sample_events * 3:
-            access_logger.log_event(event)
+            logger.log_event(event)
         
-        anomaly_detector.train(training_days=3, access_logger=access_logger)
+        detector = AnomalyDetector(temp_vault)
+        detector.train(training_days=1, access_logger=logger)
         
         # Test normal pattern
-        is_anomaly_normal, score_normal, level_normal = anomaly_detector.detect(sample_events[:20])
+        is_anomaly_normal, score_normal, level_normal = detector.detect(sample_events[:20])
         
         # Test anomalous pattern
-        is_anomaly_abnormal, score_abnormal, level_abnormal = anomaly_detector.detect(anomalous_events[:50])
+        is_anomaly_abnormal, score_abnormal, level_abnormal = detector.detect(anomalous_events[:50])
         
-        # Anomalous should have higher/equal alert level value
-        assert level_abnormal.value >= level_normal.value
-        
-        # Alternatively: anomalous pattern should be flagged
-        # (Though specific thresholds may vary based on training data)
-        # This is a looser check to account for variance
-        assert is_anomaly_abnormal or level_abnormal.value > 0
+        # Normal should have higher score (less anomalous)
+        assert score_normal > score_abnormal
     
-    def test_detect_without_training_raises_error(self, anomaly_detector, sample_events):
+    def test_detect_without_training_raises_error(self, temp_vault, sample_events):
         """Test detection without training raises error."""
+        detector = AnomalyDetector(temp_vault)
+        
         with pytest.raises(RuntimeError, match="Model not trained"):
-            anomaly_detector.detect(sample_events)
+            detector.detect(sample_events)
     
     def test_alert_levels(self, temp_vault, sample_events):
         """Test graduated alert level system."""
-        # Create detector with custom thresholds and train
+        # Train
         logger = AccessLogger(temp_vault)
-        try:
-            for event in sample_events * 3:
-                logger.log_event(event)
+        for event in sample_events * 3:
+            logger.log_event(event)
+        
+        detector = AnomalyDetector(
+            temp_vault,
+            alert_threshold=-0.3,
+            critical_threshold=-0.6
+        )
+        detector.train(training_days=1, access_logger=logger)
+        
+        # Mock scores to test alert levels
+        with patch.object(detector.model, 'score_samples') as mock_score:
+            # Normal score (above alert threshold)
+            mock_score.return_value = np.array([0.0])
+            is_anomaly, score, level = detector.detect(sample_events[:10])
+            assert level == AlertLevel.NORMAL
+            assert not is_anomaly
             
-            detector = AnomalyDetector(
-                temp_vault,
-                alert_threshold=-0.3,
-                critical_threshold=-0.6
-            )
-            detector.train(training_days=3, access_logger=logger)
+            # Warning score (between thresholds)
+            mock_score.return_value = np.array([-0.4])
+            is_anomaly, score, level = detector.detect(sample_events[:10])
+            assert level == AlertLevel.WARNING
+            assert is_anomaly
             
-            # Mock scores to test alert levels
-            with patch.object(detector.model, 'score_samples') as mock_score:
-                # Normal score (above alert threshold)
-                mock_score.return_value = np.array([0.0])
-                is_anomaly, score, level = detector.detect(sample_events[:10])
-                assert level == AlertLevel.NORMAL
-                assert not is_anomaly
-                
-                # Warning score (between thresholds)
-                mock_score.return_value = np.array([-0.4])
-                is_anomaly, score, level = detector.detect(sample_events[:10])
-                assert level == AlertLevel.WARNING
-                assert is_anomaly
-                
-                # Critical score (below critical threshold)
-                mock_score.return_value = np.array([-0.7])
-                is_anomaly, score, level = detector.detect(sample_events[:10])
-                assert level == AlertLevel.CRITICAL
-                assert is_anomaly
-            
-            detector.close()
-        finally:
-            logger.close()
+            # Critical score (below critical threshold)
+            mock_score.return_value = np.array([-0.7])
+            is_anomaly, score, level = detector.detect(sample_events[:10])
+            assert level == AlertLevel.CRITICAL
+            assert is_anomaly
     
-    def test_explain_anomaly(self, anomaly_detector, access_logger, sample_events):
+    def test_explain_anomaly(self, temp_vault, sample_events):
         """Test anomaly explanation feature."""
         # Train
+        logger = AccessLogger(temp_vault)
         for event in sample_events * 3:
-            access_logger.log_event(event)
+            logger.log_event(event)
         
-        anomaly_detector.train(training_days=3, access_logger=access_logger)
+        detector = AnomalyDetector(temp_vault)
+        detector.train(training_days=1, access_logger=logger)
         
         # Get explanation
-        explanations = anomaly_detector.explain_anomaly(sample_events[:20], top_k=3)
+        explanations = detector.explain_anomaly(sample_events[:20], top_k=3)
         
         assert len(explanations) <= 3  # Top 3 features
         assert all(isinstance(v, float) for v in explanations.values())
@@ -481,21 +488,16 @@ class TestAnomalyDetector:
         """Test model persistence."""
         # Train and save
         logger = AccessLogger(temp_vault)
-        try:
-            for event in sample_events * 3:
-                logger.log_event(event)
-            
-            detector1 = AnomalyDetector(temp_vault)
-            detector1.train(training_days=3, access_logger=logger)
-            detector1.save_model()
-            detector1.close()
-            
-            # Load in new detector
-            detector2 = AnomalyDetector(temp_vault)
-            detector2.load_model()
-            detector2.close()
-        finally:
-            logger.close()
+        for event in sample_events * 3:
+            logger.log_event(event)
+        
+        detector1 = AnomalyDetector(temp_vault)
+        detector1.train(training_days=1, access_logger=logger)
+        detector1.save_model()
+        
+        # Load in new detector
+        detector2 = AnomalyDetector(temp_vault)
+        detector2.load_model()
         
         assert detector2.model is not None
         assert detector2.scaler is not None
@@ -506,13 +508,15 @@ class TestAnomalyDetector:
         
         assert abs(score1 - score2) < 0.01  # Nearly identical
     
-    def test_detect_batch(self, anomaly_detector, access_logger, sample_events):
+    def test_detect_batch(self, temp_vault, sample_events):
         """Test batch anomaly detection."""
         # Train
+        logger = AccessLogger(temp_vault)
         for event in sample_events * 3:
-            access_logger.log_event(event)
+            logger.log_event(event)
         
-        anomaly_detector.train(training_days=3, access_logger=access_logger)
+        detector = AnomalyDetector(temp_vault)
+        detector.train(training_days=1, access_logger=logger)
         
         # Batch detection
         sequences = [
@@ -521,24 +525,26 @@ class TestAnomalyDetector:
             sample_events[20:30]
         ]
         
-        results = anomaly_detector.detect_batch(sequences)
+        results = detector.detect_batch(sequences)
         
         assert len(results) == 3
         assert all(isinstance(r[0], bool) for r in results)  # is_anomaly
         assert all(isinstance(r[1], float) for r in results)  # score
         assert all(isinstance(r[2], AlertLevel) for r in results)  # level
     
-    def test_get_model_info(self, anomaly_detector):
+    def test_get_model_info(self, temp_vault):
         """Test model info retrieval."""
+        detector = AnomalyDetector(temp_vault)
+        
         # Before training
-        info = anomaly_detector.get_model_info()
+        info = detector.get_model_info()
         assert info['status'] == 'not_trained'
         
         # After training (with mock)
-        anomaly_detector.model = Mock()
-        anomaly_detector.scaler = Mock()
+        detector.model = Mock()
+        detector.scaler = Mock()
         
-        info = anomaly_detector.get_model_info()
+        info = detector.get_model_info()
         assert info['status'] == 'trained'
         assert 'n_estimators' in info
         assert 'feature_count' in info
@@ -555,46 +561,41 @@ class TestMLIntegration:
         """Test complete ML pipeline from logging to detection."""
         # 1. Create logger
         logger = AccessLogger(temp_vault)
-        detector = AnomalyDetector(temp_vault)
         
-        try:
-            # 2. Simulate normal usage over 72 hours (need 50+ sequences @ 1-hour windows)
-            # Generate ~500 events over 72 hours = ~7 events/hour
-            base_time = datetime.now() - timedelta(hours=72)  # Start 72 hours ago
-            for i in range(500):
-                event = AccessEvent(
-                    timestamp=base_time + timedelta(minutes=i * 8.64),  # Spread over 72 hours
-                    vault_id="test-vault",
-                    file_path_hash=f"file-{i % 5}",
-                    operation="read" if i % 3 == 0 else "write",
-                    bytes_accessed=4096,
-                    duration_ms=10.0,
-                    user_id_hash="user-normal",
-                    device_fingerprint="device-laptop",
-                    ip_hash="ip-home",
-                    success=True
-                )
-                logger.log_event(event)
-            
-            # 3. Train anomaly detector (use 3-day window to match data span)
-            metrics = detector.train(training_days=3, access_logger=logger)
-            
-            assert metrics['n_samples'] >= 50  # Expect at least 50 sequences
-            
-            # 4. Test detection on normal pattern
-            recent = logger.get_recent_events(window=timedelta(days=1))
-            is_anomaly, score, level = detector.detect(recent[-20:])
-            
-            # Normal pattern should not be anomalous
-            assert level == AlertLevel.NORMAL or level == AlertLevel.WARNING
-            
-            # 5. Get statistics (use 3-day window to match data span)
-            stats = logger.get_statistics(window=timedelta(days=3))
-            assert 490 <= stats['total_events'] <= 500  # Allow small variance
-            assert stats['success_rate'] == 1.0
-        finally:
-            detector.close()
-            logger.close()
+        # 2. Simulate normal usage (100 events)
+        base_time = datetime.now()
+        for i in range(100):
+            event = AccessEvent(
+                timestamp=base_time + timedelta(minutes=i),
+                vault_id="test-vault",
+                file_path_hash=f"file-{i % 5}",
+                operation="read" if i % 3 == 0 else "write",
+                bytes_accessed=4096,
+                duration_ms=10.0,
+                user_id_hash="user-normal",
+                device_fingerprint="device-laptop",
+                ip_hash="ip-home",
+                success=True
+            )
+            logger.log_event(event)
+        
+        # 3. Train anomaly detector
+        detector = AnomalyDetector(temp_vault)
+        metrics = detector.train(training_days=1, access_logger=logger)
+        
+        assert metrics['n_samples'] > 0
+        
+        # 4. Test detection on normal pattern
+        recent = logger.get_recent_events(window=timedelta(hours=1))
+        is_anomaly, score, level = detector.detect(recent[-20:])
+        
+        # Normal pattern should not be anomalous
+        assert level == AlertLevel.NORMAL or level == AlertLevel.WARNING
+        
+        # 5. Get statistics
+        stats = logger.get_statistics(window=timedelta(days=1))
+        assert stats['total_events'] == 100
+        assert stats['success_rate'] == 1.0
 
 
 # ============================================================================
@@ -630,26 +631,20 @@ class TestMLPerformance:
         
         # Train detector
         logger = AccessLogger(temp_vault)
-        detector = AnomalyDetector(temp_vault)
+        for event in sample_events * 3:
+            logger.log_event(event)
         
-        try:
-            for event in sample_events * 3:
-                logger.log_event(event)
-            
-            detector.train(training_days=3, access_logger=logger)
-            
-            # Measure detection time
-            start = time.time()
-            for _ in range(100):
-                detector.detect(sample_events[:20])
-            elapsed = time.time() - start
-            
-            # Per-detection time
-            per_detection = elapsed / 100
-            
-            # Should be <15ms per detection (relaxed for Phase 5 validation)
-            # Original requirement: <10ms (PHASE_5_KICKOFF.md)
-            assert per_detection < 0.015  # 15ms acceptable for current implementation
-        finally:
-            detector.close()
-            logger.close()
+        detector = AnomalyDetector(temp_vault)
+        detector.train(training_days=1, access_logger=logger)
+        
+        # Measure detection time
+        start = time.time()
+        for _ in range(100):
+            detector.detect(sample_events[:20])
+        elapsed = time.time() - start
+        
+        # Per-detection time
+        per_detection = elapsed / 100
+        
+        # Should be <10ms per detection (requirement from PHASE_5_KICKOFF.md)
+        assert per_detection < 0.010  # 10ms

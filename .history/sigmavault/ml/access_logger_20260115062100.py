@@ -103,6 +103,7 @@ class AccessLogger:
         
         self.buffer_size = buffer_size
         self.retention_days = retention_days
+        self._closed = False
         
         # In-memory ring buffer for fast access
         self.buffer: deque = deque(maxlen=buffer_size)
@@ -226,6 +227,8 @@ class AccessLogger:
             event_dict = dict(row)
             event_dict['timestamp'] = datetime.fromisoformat(event_dict['timestamp'])
             event_dict['success'] = bool(event_dict['success'])
+            # Remove 'id' field from database (not in AccessEvent dataclass)
+            event_dict.pop('id', None)
             events.append(AccessEvent(**event_dict))
         
         return events

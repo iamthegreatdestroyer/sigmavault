@@ -411,13 +411,8 @@ class TestAnomalyDetector:
         # Test anomalous pattern
         is_anomaly_abnormal, score_abnormal, level_abnormal = anomaly_detector.detect(anomalous_events[:50])
         
-        # Anomalous should have higher/equal alert level value
-        assert level_abnormal.value >= level_normal.value
-        
-        # Alternatively: anomalous pattern should be flagged
-        # (Though specific thresholds may vary based on training data)
-        # This is a looser check to account for variance
-        assert is_anomaly_abnormal or level_abnormal.value > 0
+        # Normal should have higher score (less anomalous)
+        assert score_normal > score_abnormal
     
     def test_detect_without_training_raises_error(self, anomaly_detector, sample_events):
         """Test detection without training raises error."""
@@ -647,9 +642,8 @@ class TestMLPerformance:
             # Per-detection time
             per_detection = elapsed / 100
             
-            # Should be <15ms per detection (relaxed for Phase 5 validation)
-            # Original requirement: <10ms (PHASE_5_KICKOFF.md)
-            assert per_detection < 0.015  # 15ms acceptable for current implementation
+            # Should be <10ms per detection (requirement from PHASE_5_KICKOFF.md)
+            assert per_detection < 0.010  # 10ms
         finally:
             detector.close()
             logger.close()

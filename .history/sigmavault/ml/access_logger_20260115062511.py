@@ -103,6 +103,7 @@ class AccessLogger:
         
         self.buffer_size = buffer_size
         self.retention_days = retention_days
+        self._closed = False
         
         # In-memory ring buffer for fast access
         self.buffer: deque = deque(maxlen=buffer_size)
@@ -226,6 +227,8 @@ class AccessLogger:
             event_dict = dict(row)
             event_dict['timestamp'] = datetime.fromisoformat(event_dict['timestamp'])
             event_dict['success'] = bool(event_dict['success'])
+            # Remove 'id' field from database (not in AccessEvent dataclass)
+            event_dict.pop('id', None)
             events.append(AccessEvent(**event_dict))
         
         return events
@@ -327,3 +330,43 @@ class AccessLogger:
         """
         data = f"{identifier}:{salt}".encode('utf-8')
         return hashlib.sha256(data).hexdigest()
+    
+    def close(self):
+        """Close database connections and cleanup resources."""
+        if self._closed:
+            return
+        
+        # Force close any open SQLite connections
+        # SQLite connections are created/closed in context managers,
+        # but we ensure file is released
+        try:
+            # Connect, optimize, and explicitly close
+            conn = sqlite3.connect(str(self.db_path))
+            try:
+                conn.execute("PRAGMA optimize")
+                conn.commit()
+            finally:
+                conn.close()
+                del conn  # Explicit deletion to release reference
+            
+            # Force garbage collection to release file locks on Windows
+            import gc
+            gc.collect()
+            
+        except Exception:
+            pass  # Ignore errors during cleanup
+        
+        self._closed = True
+    
+    def __enter__(self):
+        """Context manager entry."""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit with cleanup."""
+        self.close()
+        return False
+    
+    def __del__(self):
+        """Ensure cleanup on garbage collection."""
+        self.close()
