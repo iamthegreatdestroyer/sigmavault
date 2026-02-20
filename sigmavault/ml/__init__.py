@@ -35,13 +35,33 @@ from .adaptive_scatter import (
     ScatterParameterOptimizer,
     create_adaptive_engine
 )
-from .pattern_vae import (
-    PatternObfuscationVAE,
-    VAEConfig,
-    GeneratedPattern,
-    create_pattern_vae,
-    generate_decoy_events
-)
+# Pattern VAE is optional (requires TensorFlow)
+try:
+    from .pattern_vae import (
+        PatternObfuscationVAE,
+        VAEConfig,
+        GeneratedPattern,
+        create_pattern_vae,
+        generate_decoy_events
+    )
+except Exception:
+    # TensorFlow not available or module has issues
+    # Provide placeholder classes so imports don't fail
+    class PatternObfuscationVAE:
+        def __init__(self, *args, **kwargs):
+            raise RuntimeError("TensorFlow is required for PatternObfuscationVAE")
+
+    class VAEConfig:
+        pass
+
+    class GeneratedPattern:
+        pass
+
+    def create_pattern_vae(*args, **kwargs):
+        raise RuntimeError("TensorFlow is required")
+
+    def generate_decoy_events(*args, **kwargs):
+        raise RuntimeError("TensorFlow is required")
 from .security_bridge import (
     MLSecurityBridge,
     MLSecurityConfig,

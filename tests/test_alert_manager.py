@@ -357,7 +357,7 @@ class TestAlertManager:
 
         rule = SuppressionRule(
             name="test_suppression",
-            condition=lambda x: x.get('severity').value < AlertSeverity.CRITICAL.value,
+            condition=lambda x: AlertSeverity[x.get('severity')].value < AlertSeverity.CRITICAL.value,
         )
         manager.add_suppression_rule(rule)
 
