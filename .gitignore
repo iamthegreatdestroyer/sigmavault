@@ -1,4 +1,4 @@
-# Byte-compiled / optimized / DLL files
+﻿# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
 *$py.class
@@ -64,7 +64,9 @@ venv.bak/
 
 # IDE
 .idea/
-.vscode/
+# .vscode tracked for shared workspace settings (VS Code 1.112)
+!.vscode/
+!.vscode/settings.json
 *.swp
 *.swo
 *~
