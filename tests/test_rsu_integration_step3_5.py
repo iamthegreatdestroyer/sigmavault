@@ -20,8 +20,19 @@ import time
 import json
 import tempfile
 
-from src.integrations.vault_backed_rsu_manager import VaultBackedRSUManager, CacheTierConfig
-from src.api.types import TokenSequence, KVCacheState, RSUReference
+try:
+    from src.integrations.vault_backed_rsu_manager import (
+        VaultBackedRSUManager, CacheTierConfig,
+    )
+    from src.api.types import TokenSequence, KVCacheState, RSUReference
+    HAS_RSU_DEPS = True
+except (ImportError, ModuleNotFoundError):
+    HAS_RSU_DEPS = False
+    VaultBackedRSUManager = None
+    CacheTierConfig = None
+    TokenSequence = None
+    KVCacheState = None
+    RSUReference = None
 
 
 class IntegrationTestSuite:

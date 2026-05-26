@@ -35,10 +35,13 @@ try:
         GeneratedPattern,
         create_pattern_vae,
         generate_decoy_events,
-        Sampling
+        Sampling,
+        HAS_TENSORFLOW as _VAE_HAS_TF,
     )
+    if not _VAE_HAS_TF:
+        raise ImportError("TensorFlow not available")
     HAS_TENSORFLOW = True
-except ImportError:
+except (ImportError, Exception):
     HAS_TENSORFLOW = False
 
 

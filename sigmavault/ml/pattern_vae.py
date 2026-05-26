@@ -77,6 +77,8 @@ except ImportError:
     HAS_TENSORFLOW = False
     tf = None
     keras = None
+    layers = None
+    Model = None
 
 from .access_logger import AccessEvent
 from .feature_extractor import FeatureExtractor
@@ -127,7 +129,10 @@ class GeneratedPattern:
 # SAMPLING LAYER (Reparameterization Trick)
 # ============================================================================
 
-class Sampling(layers.Layer):
+_SamplingBase = layers.Layer if HAS_TENSORFLOW else object
+
+
+class Sampling(_SamplingBase):
     """
     Sampling layer using the reparameterization trick.
     

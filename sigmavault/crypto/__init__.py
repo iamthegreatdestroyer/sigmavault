@@ -1,6 +1,6 @@
 """
-ΣVAULT Post-Quantum Cryptography Module
-========================================
+ΣVAULT Post-Quantum Cryptography Module — Phase 6
+===================================================
 
 Phase 6: Quantum-Safe Cryptography Implementation
 
@@ -42,6 +42,16 @@ Agents: @TENSOR @FORTRESS @NEURAL @SENTRY
 Status: PHASE 6 - DAY 1 ACTIVE
 """
 
+from enum import Enum
+
+
+class SignatureMode(Enum):
+    """Signature algorithm selection for manifold coordinate signing."""
+    CLASSIC = "classic"    # ECDSA (classical)
+    QUANTUM = "quantum"    # Dilithium3 (post-quantum)
+    HYBRID = "hybrid"      # Both ECDSA + Dilithium3
+
+
 from .kyber_key_encapsulation import (
     KyberKeyEncapsulation,
     KyberSecurityLevel,
@@ -71,6 +81,8 @@ from .hybrid_key_derivation import (
 )
 
 __all__ = [
+    # Signature mode enum
+    "SignatureMode",
     # Kyber exports
     "KyberKeyEncapsulation",
     "KyberSecurityLevel",

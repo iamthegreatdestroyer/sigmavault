@@ -61,9 +61,26 @@ import threading
 try:
     from liboqs.oqs import Signature
     HAS_LIBOQS = True
-except ImportError:
+except (ImportError, RuntimeError):
     HAS_LIBOQS = False
     Signature = None
+
+try:
+    from pqcrypto.sign import ml_dsa_44, ml_dsa_65, ml_dsa_87
+    HAS_PQCRYPTO = True
+except ImportError:
+    HAS_PQCRYPTO = False
+    ml_dsa_44 = None
+    ml_dsa_65 = None
+    ml_dsa_87 = None
+
+_PQCRYPTO_DSA_MAP = {}
+if HAS_PQCRYPTO:
+    _PQCRYPTO_DSA_MAP = {
+        "Dilithium2": ml_dsa_44,
+        "Dilithium3": ml_dsa_65,
+        "Dilithium5": ml_dsa_87,
+    }
 
 
 class DilithiumSecurityLevel(Enum):
@@ -221,10 +238,10 @@ class DilithiumSignatureScheme:
             ImportError: If liboqs is not installed
             ValueError: If security level is invalid
         """
-        if not HAS_LIBOQS:
+        if not HAS_LIBOQS and not HAS_PQCRYPTO:
             raise ImportError(
-                "liboqs-python is required for Dilithium. "
-                "Install with: pip install liboqs-python"
+                "Either liboqs-python or pqcrypto is required for Dilithium. "
+                "Install with: pip install pqcrypto"
             )
 
         if not isinstance(security_level, DilithiumSecurityLevel):
@@ -248,25 +265,26 @@ class DilithiumSignatureScheme:
         """
         with self._lock:
             try:
-                sig = Signature(self.algorithm_name)
-
-                # Generate keypair
-                public_key_bytes = sig.generate_keys()
-                secret_key_bytes = sig.export_secret_key()
+                if HAS_LIBOQS:
+                    sig = Signature(self.algorithm_name)
+                    public_key_bytes = sig.generate_keys()
+                    secret_key_bytes = sig.export_secret_key()
+                else:
+                    dsa_mod = _PQCRYPTO_DSA_MAP[self.algorithm_name]
+                    public_key_bytes, secret_key_bytes = dsa_mod.generate_keypair()
 
                 if not public_key_bytes or not secret_key_bytes:
                     raise RuntimeError("Key generation produced empty keys")
 
-                # Create key objects
                 public_key = DilithiumPublicKey(
                     security_level=self.security_level,
-                    key_data=public_key_bytes,
+                    key_data=bytes(public_key_bytes),
                     metadata={"algorithm": self.algorithm_name}
                 )
 
                 secret_key = DilithiumSecretKey(
                     security_level=self.security_level,
-                    key_data=secret_key_bytes,
+                    key_data=bytes(secret_key_bytes),
                     public_key=public_key,
                     metadata={"algorithm": self.algorithm_name}
                 )
@@ -306,20 +324,19 @@ class DilithiumSignatureScheme:
                 raise ValueError("Message must be bytes")
 
             try:
-                sig = Signature(self.algorithm_name)
-
-                # Import secret key
-                sig.import_secret_key(secret_key.key_data)
-
-                # Sign message
-                signature_bytes = sig.sign(message)
+                if HAS_LIBOQS:
+                    sig = Signature(self.algorithm_name)
+                    sig.import_secret_key(secret_key.key_data)
+                    signature_bytes = sig.sign(message)
+                else:
+                    dsa_mod = _PQCRYPTO_DSA_MAP[self.algorithm_name]
+                    signature_bytes = dsa_mod.sign(secret_key.key_data, message)
 
                 if not signature_bytes:
                     raise RuntimeError("Signature operation produced empty signature")
 
-                # Create signature object
                 signature = DilithiumSignature(
-                    signature=signature_bytes,
+                    signature=bytes(signature_bytes),
                     security_level=self.security_level,
                     metadata={
                         "algorithm": self.algorithm_name,
@@ -371,13 +388,19 @@ class DilithiumSignatureScheme:
                 )
 
             try:
-                sig = Signature(self.algorithm_name)
-
-                # Import public key
-                sig.import_public_key(public_key.key_data)
-
-                # Verify signature
-                is_valid = sig.verify(message, signature.signature)
+                if HAS_LIBOQS:
+                    sig = Signature(self.algorithm_name)
+                    sig.import_public_key(public_key.key_data)
+                    is_valid = sig.verify(message, signature.signature)
+                else:
+                    dsa_mod = _PQCRYPTO_DSA_MAP[self.algorithm_name]
+                    try:
+                        result = dsa_mod.verify(
+                            public_key.key_data, message, signature.signature
+                        )
+                        is_valid = bool(result)
+                    except Exception:
+                        is_valid = False
 
                 if not is_valid:
                     self._failed_verifications += 1
@@ -386,7 +409,6 @@ class DilithiumSignatureScheme:
                 return bool(is_valid)
 
             except Exception:
-                # Verification failure
                 self._failed_verifications += 1
                 self._operations_count += 1
                 return False

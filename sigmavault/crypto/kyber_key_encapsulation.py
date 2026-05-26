@@ -59,9 +59,26 @@ import threading
 try:
     from liboqs.oqs import OQS_STATUS, KeyEncapsulation
     HAS_LIBOQS = True
-except ImportError:
+except (ImportError, RuntimeError):
     HAS_LIBOQS = False
     KeyEncapsulation = None
+
+try:
+    from pqcrypto.kem import ml_kem_512, ml_kem_768, ml_kem_1024
+    HAS_PQCRYPTO = True
+except ImportError:
+    HAS_PQCRYPTO = False
+    ml_kem_512 = None
+    ml_kem_768 = None
+    ml_kem_1024 = None
+
+_PQCRYPTO_KEM_MAP = {}
+if HAS_PQCRYPTO:
+    _PQCRYPTO_KEM_MAP = {
+        "Kyber512": ml_kem_512,
+        "Kyber768": ml_kem_768,
+        "Kyber1024": ml_kem_1024,
+    }
 
 
 class KyberSecurityLevel(Enum):
@@ -258,13 +275,13 @@ class KyberKeyEncapsulation:
             security_level: Kyber security level (LEVEL1, LEVEL3, LEVEL5)
 
         Raises:
-            ImportError: If liboqs is not installed
+            ImportError: If neither liboqs nor pqcrypto is installed
             ValueError: If security level is invalid
         """
-        if not HAS_LIBOQS:
+        if not HAS_LIBOQS and not HAS_PQCRYPTO:
             raise ImportError(
-                "liboqs-python is required for Kyber. "
-                "Install with: pip install liboqs-python"
+                "Either liboqs-python or pqcrypto is required for Kyber. "
+                "Install with: pip install pqcrypto"
             )
 
         if not isinstance(security_level, KyberSecurityLevel):
@@ -287,25 +304,26 @@ class KyberKeyEncapsulation:
         """
         with self._lock:
             try:
-                kekem = KeyEncapsulation(self.algorithm_name)
-
-                # Generate keypair
-                public_key_bytes = kekem.generate_keyencap()
-                secret_key_bytes = kekem.secret_key
+                if HAS_LIBOQS:
+                    kekem = KeyEncapsulation(self.algorithm_name)
+                    public_key_bytes = kekem.generate_keyencap()
+                    secret_key_bytes = kekem.secret_key
+                else:
+                    kem_mod = _PQCRYPTO_KEM_MAP[self.algorithm_name]
+                    public_key_bytes, secret_key_bytes = kem_mod.generate_keypair()
 
                 if not public_key_bytes or not secret_key_bytes:
                     raise RuntimeError("Key generation produced empty keys")
 
-                # Create key objects
                 public_key = KyberPublicKey(
                     security_level=self.security_level,
-                    key_data=public_key_bytes,
+                    key_data=bytes(public_key_bytes),
                     metadata={"algorithm": self.algorithm_name}
                 )
 
                 secret_key = KyberSecretKey(
                     security_level=self.security_level,
-                    key_data=secret_key_bytes,
+                    key_data=bytes(secret_key_bytes),
                     public_key=public_key,
                     metadata={"algorithm": self.algorithm_name}
                 )
@@ -341,26 +359,25 @@ class KyberKeyEncapsulation:
                 )
 
             try:
-                kekem = KeyEncapsulation(self.algorithm_name)
-
-                # Load public key
-                kekem.load_public_key(public_key.key_data)
-
-                # Encapsulate
-                ciphertext_bytes = kekem.encap_secret()
-                shared_secret_bytes = kekem.shared_secret
+                if HAS_LIBOQS:
+                    kekem = KeyEncapsulation(self.algorithm_name)
+                    kekem.load_public_key(public_key.key_data)
+                    ciphertext_bytes = kekem.encap_secret()
+                    shared_secret_bytes = kekem.shared_secret
+                else:
+                    kem_mod = _PQCRYPTO_KEM_MAP[self.algorithm_name]
+                    ciphertext_bytes, shared_secret_bytes = kem_mod.encrypt(public_key.key_data)
 
                 if not ciphertext_bytes or not shared_secret_bytes:
                     raise RuntimeError("Encapsulation produced empty outputs")
 
-                # Create output objects
                 ciphertext = KyberCiphertext(
-                    ciphertext=ciphertext_bytes,
+                    ciphertext=bytes(ciphertext_bytes),
                     security_level=self.security_level
                 )
 
                 shared_secret = SharedSecret(
-                    secret=shared_secret_bytes,
+                    secret=bytes(shared_secret_bytes),
                     metadata={
                         "algorithm": self.algorithm_name,
                         "ciphertext_size": len(ciphertext_bytes)
@@ -406,20 +423,19 @@ class KyberKeyEncapsulation:
                 )
 
             try:
-                kekem = KeyEncapsulation(self.algorithm_name)
-
-                # Load keys
-                kekem.load_secret_key(secret_key.key_data)
-
-                # Decapsulate
-                shared_secret_bytes = kekem.decap_secret(ciphertext.ciphertext)
+                if HAS_LIBOQS:
+                    kekem = KeyEncapsulation(self.algorithm_name)
+                    kekem.load_secret_key(secret_key.key_data)
+                    shared_secret_bytes = kekem.decap_secret(ciphertext.ciphertext)
+                else:
+                    kem_mod = _PQCRYPTO_KEM_MAP[self.algorithm_name]
+                    shared_secret_bytes = kem_mod.decrypt(secret_key.key_data, ciphertext.ciphertext)
 
                 if not shared_secret_bytes:
                     raise RuntimeError("Decapsulation produced empty shared secret")
 
-                # Create shared secret
                 shared_secret = SharedSecret(
-                    secret=shared_secret_bytes,
+                    secret=bytes(shared_secret_bytes),
                     metadata={
                         "algorithm": self.algorithm_name,
                         "decapsulation_success": True
