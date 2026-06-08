@@ -16,7 +16,7 @@
 # -----------------------------------------------------------------------------
 # Stage 1: Base Python with FUSE dependencies
 # -----------------------------------------------------------------------------
-FROM python:3.11-slim-bookworm AS base
+FROM python:3.11-slim-trixie AS base
 
 # Labels
 LABEL org.opencontainers.image.title="ΣVAULT"
